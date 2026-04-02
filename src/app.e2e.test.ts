@@ -7,8 +7,10 @@ import {
 import {
   _getMessagesForChat,
   _initTestDatabase,
+  getGroupModel,
   createTask,
   getAllSessions,
+  setSession,
   setRegisteredGroup,
   storeChatMetadata,
   storeMessageDirect,
@@ -22,10 +24,15 @@ import type { Channel, RegisteredGroup } from './types.js';
 
 const sentMessages: Array<{ jid: string; text: string }> = [];
 const runContainerAgentMock = vi.fn();
+const listAvailableCopilotModelsMock = vi.fn();
 
 vi.mock('./container-runtime.js', () => ({
   cleanupOrphans: vi.fn(),
   ensureContainerRuntimeRunning: vi.fn(),
+}));
+
+vi.mock('./copilot-models.js', () => ({
+  listAvailableCopilotModels: () => listAvailableCopilotModelsMock(),
 }));
 
 vi.mock('./container-runner.js', async () => {
@@ -108,6 +115,13 @@ describe('app e2e flow', () => {
   beforeEach(() => {
     sentMessages.length = 0;
     runContainerAgentMock.mockReset();
+    listAvailableCopilotModelsMock.mockReset();
+    listAvailableCopilotModelsMock.mockResolvedValue([
+      { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5' },
+      { id: 'claude-sonnet-4.6', name: 'Claude Sonnet 4.6' },
+      { id: 'gpt-5.4', name: 'GPT-5.4' },
+      { id: 'gpt-5.4-mini', name: 'GPT-5.4 mini' },
+    ]);
     _initTestDatabase();
     _resetAppStateForTests();
     _resetChannelRegistryForTests();
@@ -388,5 +402,123 @@ describe('app e2e flow', () => {
       jid: 'fake:main',
       text: 'Scheduled result',
     });
+  });
+
+  it('lets the owner inspect and change the model per group', async () => {
+    const app = await startNanoClawApp({
+      registerSignalHandlers: false,
+      initializeDatabase: false,
+      startBackgroundLoops: false,
+    });
+
+    await app.receiveMessage('fake:main', {
+      id: 'm1',
+      chat_jid: 'fake:main',
+      sender: 'me',
+      sender_name: 'Owner',
+      content: '/model',
+      timestamp: new Date('2026-04-02T10:00:00.000Z').toISOString(),
+      is_from_me: true,
+    });
+
+    await app.receiveMessage('fake:main', {
+      id: 'm2',
+      chat_jid: 'fake:main',
+      sender: 'me',
+      sender_name: 'Owner',
+      content: '/model gpt-5.4',
+      timestamp: new Date('2026-04-02T10:01:00.000Z').toISOString(),
+      is_from_me: true,
+    });
+    await app.shutdown('model-command');
+
+    expect(getGroupModel('main')).toBe('gpt-5.4');
+    expect(sentMessages).toContainEqual({
+      jid: 'fake:main',
+      text: 'Current model for Main: default',
+    });
+    expect(sentMessages).toContainEqual({
+      jid: 'fake:main',
+      text: 'Model for Main set to gpt-5.4. A fresh Copilot session will be used on the next run.',
+    });
+    expect(runContainerAgentMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects /model from non-owner messages', async () => {
+    const app = await startNanoClawApp({
+      registerSignalHandlers: false,
+      initializeDatabase: false,
+      startBackgroundLoops: false,
+    });
+
+    await app.receiveMessage('fake:main', {
+      id: 'm1',
+      chat_jid: 'fake:main',
+      sender: 'user-1',
+      sender_name: 'User One',
+      content: '/model gpt-5.4',
+      timestamp: new Date('2026-04-02T10:00:00.000Z').toISOString(),
+      is_from_me: false,
+    });
+    await app.shutdown('model-command-non-owner');
+
+    expect(getGroupModel('main')).toBeUndefined();
+    expect(sentMessages).toContainEqual({
+      jid: 'fake:main',
+      text: 'Only the bot owner can change or inspect the model.',
+    });
+    expect(runContainerAgentMock).not.toHaveBeenCalled();
+  });
+
+  it('lists the live Copilot models for the signed-in account', async () => {
+    const app = await startNanoClawApp({
+      registerSignalHandlers: false,
+      initializeDatabase: false,
+      startBackgroundLoops: false,
+    });
+
+    await app.receiveMessage('fake:main', {
+      id: 'm1',
+      chat_jid: 'fake:main',
+      sender: 'me',
+      sender_name: 'Owner',
+      content: '/model list',
+      timestamp: new Date('2026-04-02T10:00:00.000Z').toISOString(),
+      is_from_me: true,
+    });
+    await app.shutdown('model-list');
+
+    expect(sentMessages).toContainEqual({
+      jid: 'fake:main',
+      text:
+        'Available Copilot models for this account:\n' +
+        'claude-sonnet-4.5 - Claude Sonnet 4.5\n' +
+        'claude-sonnet-4.6 - Claude Sonnet 4.6\n' +
+        'gpt-5.4 - GPT-5.4\n' +
+        'gpt-5.4-mini - GPT-5.4 mini',
+    });
+  });
+
+  it('clears the persisted session when changing the model', async () => {
+    const app = await startNanoClawApp({
+      registerSignalHandlers: false,
+      initializeDatabase: false,
+      startBackgroundLoops: false,
+    });
+    setSession('main', 'existing-session');
+
+    await app.receiveMessage('fake:main', {
+      id: 'm1',
+      chat_jid: 'fake:main',
+      sender: 'me',
+      sender_name: 'Owner',
+      content: '/model claude-sonnet-4.5',
+      timestamp: new Date('2026-04-02T10:00:00.000Z').toISOString(),
+      is_from_me: true,
+    });
+    await app.shutdown('model-session-reset');
+
+    expect(getAllSessions()).toEqual({});
+    expect(getGroupModel('main')).toBe('claude-sonnet-4.5');
   });
 });

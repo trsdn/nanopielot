@@ -24,6 +24,7 @@ import { fileURLToPath } from 'url';
 interface ContainerInput {
   prompt: string;
   sessionId?: string;
+  model?: string;
   groupFolder: string;
   chatJid: string;
   isMain: boolean;
@@ -207,6 +208,7 @@ async function runQuery(
     availableTools,
     settingSources: ['project'],
     systemMessage,
+    ...(containerInput.model ? { model: containerInput.model } : {}),
   };
 
   if (sessionId) {

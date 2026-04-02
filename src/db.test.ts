@@ -2,15 +2,18 @@ import { describe, it, expect, beforeEach } from 'vitest';
 
 import {
   _initTestDatabase,
+  clearGroupModel,
   createTask,
   deleteTask,
   getAllChats,
   getAllRegisteredGroups,
+  getGroupModel,
   getLastBotMessageTimestamp,
   getMessagesSince,
   getNewMessages,
   getTaskById,
   setRegisteredGroup,
+  setGroupModel,
   storeChatMetadata,
   storeMessage,
   updateTask,
@@ -534,6 +537,20 @@ describe('message query LIMIT', () => {
       50,
     );
     expect(messages).toHaveLength(10);
+  });
+});
+
+describe('group model state', () => {
+  it('stores and retrieves a per-group model override', () => {
+    expect(getGroupModel('main')).toBeUndefined();
+    setGroupModel('main', 'gpt-5');
+    expect(getGroupModel('main')).toBe('gpt-5');
+  });
+
+  it('clears a per-group model override', () => {
+    setGroupModel('team', 'claude-sonnet-4.5');
+    clearGroupModel('team');
+    expect(getGroupModel('team')).toBeUndefined();
   });
 });
 

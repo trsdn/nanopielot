@@ -1,6 +1,6 @@
 {
   "name": "nanoclaw",
-  "version": "1.2.42",
+  "version": "1.0.0",
   "description": "Personal Copilot assistant. Lightweight, secure, customizable.",
   "type": "module",
   "main": "dist/index.js",
@@ -20,6 +20,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@github/copilot-sdk": "^0.2.0",
     "better-sqlite3": "11.10.0",
     "cron-parser": "5.5.0",
     "grammy": "^1.39.3"

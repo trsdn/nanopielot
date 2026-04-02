@@ -558,6 +558,10 @@ export function setRouterState(key: string, value: string): void {
   ).run(key, value);
 }
 
+export function deleteRouterState(key: string): void {
+  db.prepare('DELETE FROM router_state WHERE key = ?').run(key);
+}
+
 // --- Session accessors ---
 
 export function getSession(groupFolder: string): string | undefined {
@@ -573,6 +577,10 @@ export function setSession(groupFolder: string, sessionId: string): void {
   ).run(groupFolder, sessionId);
 }
 
+export function clearSession(groupFolder: string): void {
+  db.prepare('DELETE FROM sessions WHERE group_folder = ?').run(groupFolder);
+}
+
 export function getAllSessions(): Record<string, string> {
   const rows = db
     .prepare('SELECT group_folder, session_id FROM sessions')
@@ -582,6 +590,22 @@ export function getAllSessions(): Record<string, string> {
     result[row.group_folder] = row.session_id;
   }
   return result;
+}
+
+function groupModelStateKey(groupFolder: string): string {
+  return `group_model:${groupFolder}`;
+}
+
+export function getGroupModel(groupFolder: string): string | undefined {
+  return getRouterState(groupModelStateKey(groupFolder));
+}
+
+export function setGroupModel(groupFolder: string, model: string): void {
+  setRouterState(groupModelStateKey(groupFolder), model);
+}
+
+export function clearGroupModel(groupFolder: string): void {
+  deleteRouterState(groupModelStateKey(groupFolder));
 }
 
 // --- Registered group accessors ---

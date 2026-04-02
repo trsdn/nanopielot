@@ -26,7 +26,11 @@ import {
   cleanupOrphans,
   ensureContainerRuntimeRunning,
 } from './container-runtime.js';
+import { listAvailableCopilotModels } from './copilot-models.js';
 import {
+  clearGroupModel,
+  clearSession,
+  getGroupModel,
   getAllChats,
   getAllRegisteredGroups,
   getAllSessions,
@@ -37,6 +41,7 @@ import {
   getRouterState,
   initDatabase,
   setRegisteredGroup,
+  setGroupModel,
   setRouterState,
   setSession,
   storeChatMetadata,
@@ -69,6 +74,27 @@ let messageLoopStopRequested = false;
 const channels: Channel[] = [];
 let queue = new GroupQueue();
 
+const MODEL_COMMAND_PATTERN =
+  /^\/model(?:\s+(?<arg>(?:list|show|reset)|.+))?$/i;
+
+function normalizeModelCommandValue(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ');
+}
+
+function formatModelHelp(modelIds?: string[]): string {
+  return [
+    'Model command:',
+    '/model',
+    '/model show',
+    '/model list',
+    '/model <model-id>',
+    '/model reset',
+    ...(modelIds && modelIds.length > 0
+      ? ['', `Available models: ${modelIds.join(', ')}`]
+      : []),
+  ].join('\n');
+}
+
 export interface MessageLoopHandle {
   stop(): void;
   done: Promise<void>;
@@ -78,6 +104,7 @@ export interface NanoClawAppHandle {
   shutdown(signal?: string): Promise<void>;
   runMessageLoopOnce(): Promise<void>;
   runSchedulerOnce(): Promise<void>;
+  receiveMessage(chatJid: string, msg: NewMessage): Promise<void>;
 }
 
 export interface StartNanoClawOptions {
@@ -340,6 +367,7 @@ async function runAgent(
 ): Promise<'success' | 'error'> {
   const isMain = group.isMain === true;
   const sessionId = sessions[group.folder];
+  const model = getGroupModel(group.folder);
 
   // Update tasks snapshot for container to read (filtered by group)
   const tasks = getAllTasks();
@@ -384,6 +412,7 @@ async function runAgent(
       {
         prompt,
         sessionId,
+        model,
         groupFolder: group.folder,
         chatJid,
         isMain,
@@ -593,15 +622,99 @@ export async function startNanoClawApp(
     logger.info({ chatJid }, 'Rejected legacy remote control command');
   }
 
-  // Channel callbacks (shared by all channels)
-  const channelOpts = {
-    onMessage: (chatJid: string, msg: NewMessage) => {
+  async function handleModelCommand(
+    rawCommand: string,
+    chatJid: string,
+    msg: NewMessage,
+  ): Promise<boolean> {
+    const match = rawCommand.match(MODEL_COMMAND_PATTERN);
+    if (!match) return false;
+
+    const group = registeredGroups[chatJid];
+    const channel = findChannel(channels, chatJid);
+    if (!group || !channel) return true;
+
+    if (!msg.is_from_me) {
+      await channel.sendMessage(
+        chatJid,
+        'Only the bot owner can change or inspect the model.',
+      );
+      return true;
+    }
+
+    const rawArg = match.groups?.arg?.trim();
+    if (!rawArg || rawArg.toLowerCase() === 'show') {
+      const current = getGroupModel(group.folder);
+      await channel.sendMessage(
+        chatJid,
+        current
+          ? `Current model for ${group.name}: ${current}`
+          : `Current model for ${group.name}: default`,
+      );
+      return true;
+    }
+
+    if (rawArg.toLowerCase() === 'list') {
+      const models = await listAvailableCopilotModels();
+      const lines = models.map((model) =>
+        model.name === model.id ? model.id : `${model.id} - ${model.name}`,
+      );
+      await channel.sendMessage(
+        chatJid,
+        lines.length > 0
+          ? `Available Copilot models for this account:\n${lines.join('\n')}`
+          : 'No Copilot models are currently available for this account.',
+      );
+      return true;
+    }
+
+    if (rawArg.toLowerCase() === 'reset') {
+      clearSession(group.folder);
+      delete sessions[group.folder];
+      clearGroupModel(group.folder);
+      await channel.sendMessage(
+        chatJid,
+        `Model reset for ${group.name}. The next run will use the default Copilot model.`,
+      );
+      return true;
+    }
+
+    const model = normalizeModelCommandValue(rawArg);
+    const models = await listAvailableCopilotModels();
+    const allowedModelIds = new Set(models.map((entry) => entry.id));
+    if (!allowedModelIds.has(model)) {
+      await channel.sendMessage(
+        chatJid,
+        `Unsupported model: ${model}\n\n${formatModelHelp(
+          models.map((entry) => entry.id),
+        )}`,
+      );
+      return true;
+    }
+
+    clearSession(group.folder);
+    delete sessions[group.folder];
+    setGroupModel(group.folder, model);
+    await channel.sendMessage(
+      chatJid,
+      `Model for ${group.name} set to ${model}. A fresh Copilot session will be used on the next run.`,
+    );
+    return true;
+  }
+
+  async function handleIncomingMessage(
+    chatJid: string,
+    msg: NewMessage,
+  ): Promise<void> {
       // Remote control commands — intercept before storage
       const trimmed = msg.content.trim();
       if (trimmed === '/remote-control' || trimmed === '/remote-control-end') {
-        handleRemoteControl(trimmed, chatJid).catch((err) =>
-          logger.error({ err, chatJid }, 'Remote control command error'),
-        );
+        await handleRemoteControl(trimmed, chatJid);
+        return;
+      }
+
+      if (trimmed.startsWith('/model')) {
+        await handleModelCommand(trimmed, chatJid, msg);
         return;
       }
 
@@ -622,6 +735,14 @@ export async function startNanoClawApp(
         }
       }
       storeMessage(msg);
+  }
+
+  // Channel callbacks (shared by all channels)
+  const channelOpts = {
+    onMessage: (chatJid: string, msg: NewMessage) => {
+      handleIncomingMessage(chatJid, msg).catch((err) =>
+        logger.error({ err, chatJid }, 'Inbound message handler error'),
+      );
     },
     onChatMetadata: (
       chatJid: string,
@@ -780,6 +901,7 @@ export async function startNanoClawApp(
           if (text) await channel.sendMessage(jid, text);
         },
       }),
+    receiveMessage: handleIncomingMessage,
   };
 }
 
