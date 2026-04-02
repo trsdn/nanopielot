@@ -706,35 +706,35 @@ export async function startNanoClawApp(
     chatJid: string,
     msg: NewMessage,
   ): Promise<void> {
-      // Remote control commands — intercept before storage
-      const trimmed = msg.content.trim();
-      if (trimmed === '/remote-control' || trimmed === '/remote-control-end') {
-        await handleRemoteControl(trimmed, chatJid);
-        return;
-      }
+    // Remote control commands — intercept before storage
+    const trimmed = msg.content.trim();
+    if (trimmed === '/remote-control' || trimmed === '/remote-control-end') {
+      await handleRemoteControl(trimmed, chatJid);
+      return;
+    }
 
-      if (trimmed.startsWith('/model')) {
-        await handleModelCommand(trimmed, chatJid, msg);
-        return;
-      }
+    if (trimmed.startsWith('/model')) {
+      await handleModelCommand(trimmed, chatJid, msg);
+      return;
+    }
 
-      // Sender allowlist drop mode: discard messages from denied senders before storing
-      if (!msg.is_from_me && !msg.is_bot_message && registeredGroups[chatJid]) {
-        const cfg = loadSenderAllowlist();
-        if (
-          shouldDropMessage(chatJid, cfg) &&
-          !isSenderAllowed(chatJid, msg.sender, cfg)
-        ) {
-          if (cfg.logDenied) {
-            logger.debug(
-              { chatJid, sender: msg.sender },
-              'sender-allowlist: dropping message (drop mode)',
-            );
-          }
-          return;
+    // Sender allowlist drop mode: discard messages from denied senders before storing
+    if (!msg.is_from_me && !msg.is_bot_message && registeredGroups[chatJid]) {
+      const cfg = loadSenderAllowlist();
+      if (
+        shouldDropMessage(chatJid, cfg) &&
+        !isSenderAllowed(chatJid, msg.sender, cfg)
+      ) {
+        if (cfg.logDenied) {
+          logger.debug(
+            { chatJid, sender: msg.sender },
+            'sender-allowlist: dropping message (drop mode)',
+          );
         }
+        return;
       }
-      storeMessage(msg);
+    }
+    storeMessage(msg);
   }
 
   // Channel callbacks (shared by all channels)
