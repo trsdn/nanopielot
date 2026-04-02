@@ -14,9 +14,9 @@
 
 NanoPieLot is a full port from Anthropic/Claude to the GitHub Copilot SDK:
 
-- **No API keys.** Authentication via `copilot login` device flow — no tokens in `.env` files.
 - **Any Copilot model.** `/model list` to see what's available, `/model <id>` to switch. GPT-4.1, Claude, Gemini — whatever your GitHub plan gives you.
 - **Same architecture.** Everything else works exactly like NanoClaw: containers, channels, skills, groups, scheduling.
+- Authentication via `copilot login` device flow.
 
 ## Quick Start
 
