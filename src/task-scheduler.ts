@@ -75,6 +75,10 @@ export interface SchedulerDependencies {
   sendMessage: (jid: string, text: string) => Promise<void>;
 }
 
+export interface SchedulerLoopHandle {
+  stop(): void;
+}
+
 async function runTask(
   task: ScheduledTask,
   deps: SchedulerDependencies,
@@ -241,44 +245,76 @@ async function runTask(
 }
 
 let schedulerRunning = false;
+let schedulerTimer: ReturnType<typeof setTimeout> | null = null;
 
-export function startSchedulerLoop(deps: SchedulerDependencies): void {
+export async function runSchedulerIteration(
+  deps: SchedulerDependencies,
+): Promise<void> {
+  try {
+    const dueTasks = getDueTasks();
+    if (dueTasks.length > 0) {
+      logger.info({ count: dueTasks.length }, 'Found due tasks');
+    }
+
+    for (const task of dueTasks) {
+      // Re-check task status in case it was paused/cancelled
+      const currentTask = getTaskById(task.id);
+      if (!currentTask || currentTask.status !== 'active') {
+        continue;
+      }
+
+      deps.queue.enqueueTask(currentTask.chat_jid, currentTask.id, () =>
+        runTask(currentTask, deps),
+      );
+    }
+  } catch (err) {
+    logger.error({ err }, 'Error in scheduler loop');
+  }
+}
+
+export function startSchedulerLoop(
+  deps: SchedulerDependencies,
+): SchedulerLoopHandle {
   if (schedulerRunning) {
     logger.debug('Scheduler loop already running, skipping duplicate start');
-    return;
+    return {
+      stop() {
+        if (schedulerTimer) {
+          clearTimeout(schedulerTimer);
+          schedulerTimer = null;
+        }
+        schedulerRunning = false;
+      },
+    };
   }
   schedulerRunning = true;
   logger.info('Scheduler loop started');
 
   const loop = async () => {
-    try {
-      const dueTasks = getDueTasks();
-      if (dueTasks.length > 0) {
-        logger.info({ count: dueTasks.length }, 'Found due tasks');
-      }
-
-      for (const task of dueTasks) {
-        // Re-check task status in case it was paused/cancelled
-        const currentTask = getTaskById(task.id);
-        if (!currentTask || currentTask.status !== 'active') {
-          continue;
-        }
-
-        deps.queue.enqueueTask(currentTask.chat_jid, currentTask.id, () =>
-          runTask(currentTask, deps),
-        );
-      }
-    } catch (err) {
-      logger.error({ err }, 'Error in scheduler loop');
-    }
-
-    setTimeout(loop, SCHEDULER_POLL_INTERVAL);
+    if (!schedulerRunning) return;
+    await runSchedulerIteration(deps);
+    if (!schedulerRunning) return;
+    schedulerTimer = setTimeout(loop, SCHEDULER_POLL_INTERVAL);
   };
 
-  loop();
+  void loop();
+
+  return {
+    stop() {
+      schedulerRunning = false;
+      if (schedulerTimer) {
+        clearTimeout(schedulerTimer);
+        schedulerTimer = null;
+      }
+    },
+  };
 }
 
 /** @internal - for tests only. */
 export function _resetSchedulerLoopForTests(): void {
   schedulerRunning = false;
+  if (schedulerTimer) {
+    clearTimeout(schedulerTimer);
+    schedulerTimer = null;
+  }
 }

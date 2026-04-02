@@ -66,7 +66,7 @@ grep 'groupCount' logs/nanoclaw.log | tail -3
 
 ```bash
 # Check for concurrent CLI processes in session debug logs
-ls -la data/sessions/<group>/.claude/debug/
+ls -la groups/<group>/.github/debug/
 
 # Count unique SDK processes that handled messages
 # Each .txt file = one CLI subprocess. Multiple = concurrent queries.
@@ -74,7 +74,7 @@ ls -la data/sessions/<group>/.claude/debug/
 # Check parentUuid branching in transcript
 python3 -c "
 import json, sys
-lines = open('data/sessions/<group>/.claude/projects/-workspace-group/<session>.jsonl').read().strip().split('\n')
+lines = open('groups/<group>/.github/projects/-workspace-group/<session>.jsonl').read().strip().split('\n')
 for i, line in enumerate(lines):
   try:
     d = json.loads(line)

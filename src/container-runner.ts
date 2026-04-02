@@ -10,6 +10,7 @@ import {
   CONTAINER_IMAGE,
   CONTAINER_MAX_OUTPUT_SIZE,
   CONTAINER_TIMEOUT,
+  COPILOT_AUTH_DIR,
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
@@ -23,7 +24,6 @@ import {
   readonlyMountArgs,
   stopContainer,
 } from './container-runtime.js';
-import { readEnvFile } from './env.js';
 import { validateAdditionalMounts } from './mount-security.js';
 import { RegisteredGroup } from './types.js';
 
@@ -65,7 +65,7 @@ function buildVolumeMounts(
 
   if (isMain) {
     // Main gets the project root read-only. Writable paths the agent needs
-    // (group folder, IPC, .claude/) are mounted separately below.
+    // (group folder and IPC) are mounted separately below.
     // Read-only prevents the agent from modifying host application code
     // (src/, dist/, package.json, etc.) which would bypass the sandbox
     // entirely on next restart.
@@ -76,7 +76,7 @@ function buildVolumeMounts(
     });
 
     // Shadow .env so the agent cannot read secrets from the mounted project root.
-    // Credentials are injected by the credential proxy, never exposed to containers.
+    // Copilot auth is mounted separately from the dedicated auth directory.
     const envFile = path.join(projectRoot, '.env');
     if (fs.existsSync(envFile)) {
       mounts.push({
@@ -112,27 +112,12 @@ function buildVolumeMounts(
     }
   }
 
-  // Per-group Claude sessions directory (isolated from other groups)
-  // Each group gets their own .claude/ to prevent cross-group session access
-  const groupSessionsDir = path.join(
-    DATA_DIR,
-    'sessions',
-    group.folder,
-    '.claude',
-  );
-  fs.mkdirSync(groupSessionsDir, { recursive: true });
-  const settingsFile = path.join(groupSessionsDir, 'settings.json');
-  if (!fs.existsSync(settingsFile)) {
-    fs.writeFileSync(
-      settingsFile,
-      JSON.stringify({}, null, 2) + '\n',
-    );
-  }
-
-  // Sync skills from container/skills/ into each group's .claude/skills/
+  // Sync container-only skills into each group's repository-local Copilot
+  // skill directory so every group stays isolated.
   const skillsSrc = path.join(process.cwd(), 'container', 'skills');
-  const skillsDst = path.join(groupSessionsDir, 'skills');
+  const skillsDst = path.join(groupDir, '.github', 'skills');
   if (fs.existsSync(skillsSrc)) {
+    fs.mkdirSync(skillsDst, { recursive: true });
     for (const skillDir of fs.readdirSync(skillsSrc)) {
       const srcDir = path.join(skillsSrc, skillDir);
       if (!fs.statSync(srcDir).isDirectory()) continue;
@@ -140,9 +125,13 @@ function buildVolumeMounts(
       fs.cpSync(srcDir, dstDir, { recursive: true });
     }
   }
+
+  // Shared Copilot auth state. Setup seeds this directory with a device-login
+  // session, and each agent container reuses it through HOME=/home/node.
+  fs.mkdirSync(COPILOT_AUTH_DIR, { recursive: true });
   mounts.push({
-    hostPath: groupSessionsDir,
-    containerPath: '/home/node/.claude',
+    hostPath: COPILOT_AUTH_DIR,
+    containerPath: '/home/node/.copilot',
     readonly: false,
   });
 
@@ -212,13 +201,7 @@ function buildContainerArgs(
 
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
-
-  // Pass GitHub token for Copilot SDK authentication.
-  // The SDK uses GITHUB_TOKEN env var to authenticate with GitHub Copilot.
-  const secrets = readEnvFile(['GITHUB_TOKEN']);
-  if (secrets.GITHUB_TOKEN) {
-    args.push('-e', `GITHUB_TOKEN=${secrets.GITHUB_TOKEN}`);
-  }
+  args.push('-e', 'HOME=/home/node');
 
   // Runtime-specific args for host gateway resolution
   args.push(...hostGatewayArgs());
@@ -230,7 +213,6 @@ function buildContainerArgs(
   const hostGid = process.getgid?.();
   if (hostUid != null && hostUid !== 0 && hostUid !== 1000) {
     args.push('--user', `${hostUid}:${hostGid}`);
-    args.push('-e', 'HOME=/home/node');
   }
 
   for (const mount of mounts) {

@@ -310,7 +310,7 @@ describe('TelegramChannel', () => {
       await triggerTextMessage(ctx2);
       expect(opts.onMessage).not.toHaveBeenCalled();
 
-      // Non-bot /commands should flow through
+      // Non-bot /commands should flow through so the main app can handle them
       const ctx3 = createTextCtx({ text: '/remote-control' });
       await triggerTextMessage(ctx3);
       expect(opts.onMessage).toHaveBeenCalledTimes(1);

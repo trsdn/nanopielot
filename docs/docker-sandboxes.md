@@ -12,19 +12,19 @@ Host (macOS / Windows WSL)
     │   └── Container spawner → nested Docker daemon
     └── Docker-in-Docker
         └── nanoclaw-agent containers
-            └── Claude Agent SDK
+            └── GitHub Copilot SDK
 ```
 
 Each agent runs in its own container, inside a micro VM that is fully isolated from your host. Two layers of isolation: per-agent containers + the VM boundary.
 
-The sandbox provides a MITM proxy at `host.docker.internal:3128` that handles network access and injects your Anthropic API key automatically.
+The sandbox provides a MITM proxy at `host.docker.internal:3128` that handles network access and injects your GitHub Copilot key automatically.
 
 > **Note:** This guide is based on a validated setup running on macOS (Apple Silicon) with WhatsApp. Other channels (Telegram, Slack, etc.) and environments (Windows WSL) may require additional proxy patches for their specific HTTP/WebSocket clients. The core patches (container runner, credential proxy, Dockerfile) apply universally — channel-specific proxy configuration varies.
 
 ## Prerequisites
 
 - **Docker Desktop v4.40+** with Sandbox support
-- **Anthropic API key** (the sandbox proxy manages injection)
+- **GitHub Copilot key** (the sandbox proxy manages injection)
 - For **Telegram**: a bot token from [@BotFather](https://t.me/BotFather) and your chat ID
 - For **WhatsApp**: a phone with WhatsApp installed
 
@@ -77,7 +77,7 @@ NanoClaw must live inside the workspace directory — Docker-in-Docker can only 
 ```bash
 # Clone to home first (virtiofs can corrupt git pack files during clone)
 cd ~
-git clone https://github.com/qwibitai/nanoclaw.git
+git clone https://github.com/trsdn/nanoclaw.git
 
 # Replace with YOUR workspace path (the host path you passed to `docker sandbox create`)
 WORKSPACE=/Users/you/nanoclaw-workspace
@@ -166,19 +166,7 @@ In `src/container-runtime.ts`, the `cleanupOrphans()` function matches container
 // In cleanupOrphans(), filter out os.hostname() from the list of containers to stop
 ```
 
-### 4e. Credential proxy — route through MITM proxy
-
-In `src/credential-proxy.ts`, upstream API requests need to go through the sandbox proxy. Add `HttpsProxyAgent` to outbound requests:
-
-```typescript
-import { HttpsProxyAgent } from 'https-proxy-agent';
-
-const proxyUrl = process.env.HTTPS_PROXY || process.env.https_proxy;
-const upstreamAgent = proxyUrl ? new HttpsProxyAgent(proxyUrl) : undefined;
-// Pass upstreamAgent to https.request() options
-```
-
-### 4f. Setup script — proxy build args
+### 4e. Setup script — proxy build args
 
 Patch `setup/container.ts` to pass the same proxy `--build-arg` flags as `build.sh` (Step 4b).
 
@@ -195,7 +183,7 @@ bash container/build.sh
 
 ```bash
 # Apply the Telegram skill
-npx tsx scripts/apply-skill.ts .claude/skills/add-telegram
+/add-telegram
 
 # Rebuild after applying the skill
 npm run build
@@ -204,7 +192,6 @@ npm run build
 cat > .env << EOF
 TELEGRAM_BOT_TOKEN=<your-token-from-botfather>
 ASSISTANT_NAME=nanoclaw
-ANTHROPIC_API_KEY=proxy-managed
 EOF
 mkdir -p data/env && cp .env data/env/env
 
@@ -235,7 +222,7 @@ Make sure you configured proxy bypass in [Step 1](#step-1-create-the-sandbox) fi
 
 ```bash
 # Apply the WhatsApp skill
-npx tsx scripts/apply-skill.ts .claude/skills/add-whatsapp
+/add-whatsapp
 
 # Rebuild
 npm run build
@@ -247,13 +234,8 @@ ANTHROPIC_API_KEY=proxy-managed
 EOF
 mkdir -p data/env && cp .env data/env/env
 
-# Authenticate (choose one):
-
-# QR code — scan with WhatsApp camera:
-npx tsx src/whatsapp-auth.ts
-
-# OR pairing code — enter code in WhatsApp > Linked Devices > Link with phone number:
-npx tsx src/whatsapp-auth.ts --pairing-code --phone <phone-number-no-plus>
+# Authenticate Copilot once for the workspace:
+npx tsx setup/index.ts --step copilot-auth
 
 # Register your chat (JID = your phone number + @s.whatsapp.net)
 npx tsx setup/index.ts --step register \
@@ -267,7 +249,7 @@ npx tsx setup/index.ts --step register \
   --no-trigger-required
 ```
 
-**Important:** The WhatsApp skill files (`src/channels/whatsapp.ts` and `src/whatsapp-auth.ts`) also need proxy patches — add `HttpsProxyAgent` for WebSocket connections and a proxy-aware version fetch. Then rebuild.
+**Important:** If you add WhatsApp support in your fork, patch the WhatsApp channel implementation for proxy-aware WebSocket/version access too, then rebuild.
 
 ### Both Channels
 
@@ -325,7 +307,7 @@ All bind-mounted paths must be under the workspace directory. Check:
 - Is the CA cert copied to the project root?
 - Has the empty `.env` shadow file been created?
 
-### Agent containers can't reach Anthropic API
+### Agent containers can't reach GitHub Copilot
 Verify proxy env vars are forwarded to agent containers. Check container logs for `HTTP_PROXY=http://host.docker.internal:3128`.
 
 ### WhatsApp error 405
@@ -347,7 +329,7 @@ docker sandbox network proxy <sandbox-name> \
 ### Git clone fails with "inflate: data stream error"
 Clone to a non-workspace path first, then move:
 ```bash
-cd ~ && git clone https://github.com/qwibitai/nanoclaw.git && mv nanoclaw /path/to/workspace/nanoclaw
+cd ~ && git clone https://github.com/trsdn/nanoclaw.git && mv nanoclaw /path/to/workspace/nanoclaw
 ```
 
 ### WhatsApp QR code doesn't display
@@ -355,5 +337,5 @@ Run the auth command interactively inside the sandbox (not piped through `docker
 ```bash
 docker sandbox run shell-nanoclaw-workspace
 # Then inside:
-npx tsx src/whatsapp-auth.ts
+npx tsx setup/index.ts --step copilot-auth
 ```

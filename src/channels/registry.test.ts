@@ -1,6 +1,7 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 
 import {
+  _resetChannelRegistryForTests,
   registerChannel,
   getChannelFactory,
   getRegisteredChannelNames,
@@ -12,6 +13,10 @@ import {
 // registration order, we can test the public API directly.
 
 describe('channel registry', () => {
+  beforeEach(() => {
+    _resetChannelRegistryForTests();
+  });
+
   // Note: registry is shared module state across tests in this file.
   // Tests are ordered to account for cumulative registrations.
 
@@ -26,6 +31,7 @@ describe('channel registry', () => {
   });
 
   it('getRegisteredChannelNames includes registered channels', () => {
+    registerChannel('test-channel', () => null);
     registerChannel('another-channel', () => null);
     const names = getRegisteredChannelNames();
     expect(names).toContain('test-channel');

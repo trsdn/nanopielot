@@ -26,3 +26,8 @@ export function getChannelFactory(name: string): ChannelFactory | undefined {
 export function getRegisteredChannelNames(): string[] {
   return [...registry.keys()];
 }
+
+/** @internal - for tests only. */
+export function _resetChannelRegistryForTests(): void {
+  registry.clear();
+}

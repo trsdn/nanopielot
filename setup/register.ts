@@ -116,31 +116,31 @@ export async function run(args: string[]): Promise<void> {
     recursive: true,
   });
 
-  // Create CLAUDE.md in the new group folder from template if it doesn't exist.
-  // The agent runs with CWD=/workspace/group and loads CLAUDE.md from there.
-  // Never overwrite an existing CLAUDE.md — users customize these extensively
+  // Create AGENTS.md in the new group folder from template if it doesn't exist.
+  // The agent runs with CWD=/workspace/group and loads AGENTS.md from there.
+  // Never overwrite an existing AGENTS.md — users customize these extensively
   // (persona, workspace structure, communication rules, family context, etc.)
   // and a stock template replacement would destroy that work.
-  const groupClaudeMdPath = path.join(
+  const groupAgentsPath = path.join(
     projectRoot,
     'groups',
     parsed.folder,
-    'CLAUDE.md',
+    'AGENTS.md',
   );
-  if (!fs.existsSync(groupClaudeMdPath)) {
+  if (!fs.existsSync(groupAgentsPath)) {
     const templatePath = parsed.isMain
-      ? path.join(projectRoot, 'groups', 'main', 'CLAUDE.md')
-      : path.join(projectRoot, 'groups', 'global', 'CLAUDE.md');
+      ? path.join(projectRoot, 'groups', 'main', 'AGENTS.md')
+      : path.join(projectRoot, 'groups', 'global', 'AGENTS.md');
     if (fs.existsSync(templatePath)) {
-      fs.copyFileSync(templatePath, groupClaudeMdPath);
+      fs.copyFileSync(templatePath, groupAgentsPath);
       logger.info(
-        { file: groupClaudeMdPath, template: templatePath },
-        'Created CLAUDE.md from template',
+        { file: groupAgentsPath, template: templatePath },
+        'Created AGENTS.md from template',
       );
     }
   }
 
-  // Update assistant name in CLAUDE.md files if different from default
+  // Update assistant name in AGENTS.md files if different from default
   let nameUpdated = false;
   if (parsed.assistantName !== 'Andy') {
     logger.info(
@@ -151,7 +151,7 @@ export async function run(args: string[]): Promise<void> {
     const groupsDir = path.join(projectRoot, 'groups');
     const mdFiles = fs
       .readdirSync(groupsDir)
-      .map((d) => path.join(groupsDir, d, 'CLAUDE.md'))
+      .map((d) => path.join(groupsDir, d, 'AGENTS.md'))
       .filter((f) => fs.existsSync(f));
 
     for (const mdFile of mdFiles) {
@@ -163,7 +163,7 @@ export async function run(args: string[]): Promise<void> {
           `You are ${parsed.assistantName}`,
         );
         fs.writeFileSync(mdFile, content);
-        logger.info({ file: mdFile }, 'Updated CLAUDE.md');
+        logger.info({ file: mdFile }, 'Updated AGENTS.md');
       }
     }
 

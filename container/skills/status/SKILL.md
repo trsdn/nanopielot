@@ -93,7 +93,7 @@ Present as a clean, readable message:
 *Container:*
 • agent-browser: ✓ / not installed
 • Node: vXX.X.X
-• Claude Code: vX.X.X
+• Copilot CLI: vX.X.X
 
 *Scheduled Tasks:*
 • N active tasks / No scheduled tasks

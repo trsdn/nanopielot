@@ -7,6 +7,7 @@ import path from 'path';
 
 import Database from 'better-sqlite3';
 
+import { hasCopilotAuth } from '../src/copilot-auth.js';
 import { STORE_DIR } from '../src/config.js';
 import { logger } from '../src/logger.js';
 import { commandExists, getPlatform, isHeadless, isWSL } from './platform.js';
@@ -41,6 +42,7 @@ export async function run(_args: string[]): Promise<void> {
 
   // Check existing config
   const hasEnv = fs.existsSync(path.join(projectRoot, '.env'));
+  const hasCopilotAuthConfig = hasCopilotAuth();
 
   const authDir = path.join(projectRoot, 'store', 'auth');
   const hasAuth = fs.existsSync(authDir) && fs.readdirSync(authDir).length > 0;
@@ -73,6 +75,7 @@ export async function run(_args: string[]): Promise<void> {
       appleContainer,
       docker,
       hasEnv,
+      hasCopilotAuthConfig,
       hasAuth,
       hasRegisteredGroups,
     },
@@ -86,6 +89,7 @@ export async function run(_args: string[]): Promise<void> {
     APPLE_CONTAINER: appleContainer,
     DOCKER: docker,
     HAS_ENV: hasEnv,
+    HAS_COPILOT_AUTH: hasCopilotAuthConfig,
     HAS_AUTH: hasAuth,
     HAS_REGISTERED_GROUPS: hasRegisteredGroups,
     STATUS: 'success',

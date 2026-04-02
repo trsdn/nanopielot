@@ -40,7 +40,7 @@ For detailed release notes, see the [full changelog on the documentation site](h
 
 ## [1.2.14] - 2026-03-14
 
-- Added `/remote-control` command for host-level Claude Code access from within containers
+- Added `/remote-control` command for host-level Copilot CLI access from within containers
 
 ## [1.2.13] - 2026-03-14
 
@@ -140,5 +140,5 @@ For detailed release notes, see the [full changelog on the documentation site](h
 
 ## [1.1.0] - 2026-02-23
 
-- Added `/update` skill to pull upstream changes from within Claude Code
+- Added `/update` skill to pull upstream changes from within Copilot CLI
 - Enhanced container environment isolation via credential proxy

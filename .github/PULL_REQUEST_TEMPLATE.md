@@ -2,7 +2,7 @@
 ## Type of Change
 
 - [ ] **Feature skill** - adds a channel or integration (source code changes + SKILL.md)
-- [ ] **Utility skill** - adds a standalone tool (code files in `.claude/skills/<name>/`, no source changes)
+- [ ] **Utility skill** - adds a standalone tool (code files in `.github/skills/<name>/`, no source changes)
 - [ ] **Operational/container skill** - adds a workflow or agent skill (SKILL.md only, no source changes)
 - [ ] **Fix** - bug fix or security fix to source code
 - [ ] **Simplification** - reduces or simplifies source code

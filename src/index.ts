@@ -3,7 +3,6 @@ import path from 'path';
 
 import {
   ASSISTANT_NAME,
-  CREDENTIAL_PROXY_PORT,
   DEFAULT_TRIGGER,
   getTriggerPattern,
   GROUPS_DIR,
@@ -12,7 +11,6 @@ import {
   POLL_INTERVAL,
   TIMEZONE,
 } from './config.js';
-import { startCredentialProxy } from './credential-proxy.js';
 import './channels/index.js';
 import {
   getChannelFactory,
@@ -27,7 +25,6 @@ import {
 import {
   cleanupOrphans,
   ensureContainerRuntimeRunning,
-  PROXY_BIND_HOST,
 } from './container-runtime.js';
 import {
   getAllChats,
@@ -50,17 +47,12 @@ import { resolveGroupFolderPath } from './group-folder.js';
 import { startIpcWatcher } from './ipc.js';
 import { findChannel, formatMessages, formatOutbound } from './router.js';
 import {
-  restoreRemoteControl,
-  startRemoteControl,
-  stopRemoteControl,
-} from './remote-control.js';
-import {
   isSenderAllowed,
   isTriggerAllowed,
   loadSenderAllowlist,
   shouldDropMessage,
 } from './sender-allowlist.js';
-import { startSchedulerLoop } from './task-scheduler.js';
+import { runSchedulerIteration, startSchedulerLoop } from './task-scheduler.js';
 import { Channel, NewMessage, RegisteredGroup } from './types.js';
 import { logger } from './logger.js';
 
@@ -72,9 +64,27 @@ let sessions: Record<string, string> = {};
 let registeredGroups: Record<string, RegisteredGroup> = {};
 let lastAgentTimestamp: Record<string, string> = {};
 let messageLoopRunning = false;
+let messageLoopStopRequested = false;
 
 const channels: Channel[] = [];
-const queue = new GroupQueue();
+let queue = new GroupQueue();
+
+export interface MessageLoopHandle {
+  stop(): void;
+  done: Promise<void>;
+}
+
+export interface NanoClawAppHandle {
+  shutdown(signal?: string): Promise<void>;
+  runMessageLoopOnce(): Promise<void>;
+  runSchedulerOnce(): Promise<void>;
+}
+
+export interface StartNanoClawOptions {
+  registerSignalHandlers?: boolean;
+  initializeDatabase?: boolean;
+  startBackgroundLoops?: boolean;
+}
 
 function loadState(): void {
   lastTimestamp = getRouterState('last_timestamp') || '';
@@ -137,14 +147,14 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
   // Create group folder
   fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
 
-  // Copy CLAUDE.md template into the new group folder so agents have
+  // Copy AGENTS.md template into the new group folder so agents have
   // identity and instructions from the first run.  (Fixes #1391)
-  const groupMdFile = path.join(groupDir, 'CLAUDE.md');
+  const groupMdFile = path.join(groupDir, 'AGENTS.md');
   if (!fs.existsSync(groupMdFile)) {
     const templateFile = path.join(
       GROUPS_DIR,
       group.isMain ? 'main' : 'global',
-      'CLAUDE.md',
+      'AGENTS.md',
     );
     if (fs.existsSync(templateFile)) {
       let content = fs.readFileSync(templateFile, 'utf-8');
@@ -153,7 +163,7 @@ function registerGroup(jid: string, group: RegisteredGroup): void {
         content = content.replace(/You are Andy/g, `You are ${ASSISTANT_NAME}`);
       }
       fs.writeFileSync(groupMdFile, content);
-      logger.info({ folder: group.folder }, 'Created CLAUDE.md from template');
+      logger.info({ folder: group.folder }, 'Created AGENTS.md from template');
     }
   }
 
@@ -186,6 +196,18 @@ export function _setRegisteredGroups(
   groups: Record<string, RegisteredGroup>,
 ): void {
   registeredGroups = groups;
+}
+
+/** @internal - for tests only. */
+export function _resetAppStateForTests(): void {
+  lastTimestamp = '';
+  sessions = {};
+  registeredGroups = {};
+  lastAgentTimestamp = {};
+  messageLoopRunning = false;
+  messageLoopStopRequested = false;
+  channels.splice(0, channels.length);
+  queue = new GroupQueue();
 }
 
 /**
@@ -392,107 +414,119 @@ async function runAgent(
   }
 }
 
-async function startMessageLoop(): Promise<void> {
+export async function runMessageLoopIteration(): Promise<void> {
+  const jids = Object.keys(registeredGroups);
+  const { messages, newTimestamp } = getNewMessages(
+    jids,
+    lastTimestamp,
+    ASSISTANT_NAME,
+  );
+
+  if (messages.length === 0) return;
+
+  logger.info({ count: messages.length }, 'New messages');
+
+  // Advance the "seen" cursor for all messages immediately
+  lastTimestamp = newTimestamp;
+  saveState();
+
+  // Deduplicate by group
+  const messagesByGroup = new Map<string, NewMessage[]>();
+  for (const msg of messages) {
+    const existing = messagesByGroup.get(msg.chat_jid);
+    if (existing) {
+      existing.push(msg);
+    } else {
+      messagesByGroup.set(msg.chat_jid, [msg]);
+    }
+  }
+
+  for (const [chatJid, groupMessages] of messagesByGroup) {
+    const group = registeredGroups[chatJid];
+    if (!group) continue;
+
+    const channel = findChannel(channels, chatJid);
+    if (!channel) {
+      logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
+      continue;
+    }
+
+    const isMainGroup = group.isMain === true;
+    const needsTrigger = !isMainGroup && group.requiresTrigger !== false;
+
+    if (needsTrigger) {
+      const triggerPattern = getTriggerPattern(group.trigger);
+      const allowlistCfg = loadSenderAllowlist();
+      const hasTrigger = groupMessages.some(
+        (m) =>
+          triggerPattern.test(m.content.trim()) &&
+          (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+      );
+      if (!hasTrigger) continue;
+    }
+
+    const allPending = getMessagesSince(
+      chatJid,
+      getOrRecoverCursor(chatJid),
+      ASSISTANT_NAME,
+      MAX_MESSAGES_PER_PROMPT,
+    );
+    const messagesToSend = allPending.length > 0 ? allPending : groupMessages;
+    const formatted = formatMessages(messagesToSend, TIMEZONE);
+
+    if (queue.sendMessage(chatJid, formatted)) {
+      logger.debug(
+        { chatJid, count: messagesToSend.length },
+        'Piped messages to active container',
+      );
+      lastAgentTimestamp[chatJid] = messagesToSend[messagesToSend.length - 1].timestamp;
+      saveState();
+      channel
+        .setTyping?.(chatJid, true)
+        ?.catch((err) =>
+          logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
+        );
+    } else {
+      queue.enqueueMessageCheck(chatJid);
+    }
+  }
+}
+
+export function startMessageLoop(): MessageLoopHandle {
   if (messageLoopRunning) {
     logger.debug('Message loop already running, skipping duplicate start');
-    return;
+    return {
+      stop() {
+        messageLoopStopRequested = true;
+      },
+      done: Promise.resolve(),
+    };
   }
   messageLoopRunning = true;
+  messageLoopStopRequested = false;
 
   logger.info(`NanoClaw running (default trigger: ${DEFAULT_TRIGGER})`);
 
-  while (true) {
-    try {
-      const jids = Object.keys(registeredGroups);
-      const { messages, newTimestamp } = getNewMessages(
-        jids,
-        lastTimestamp,
-        ASSISTANT_NAME,
-      );
-
-      if (messages.length > 0) {
-        logger.info({ count: messages.length }, 'New messages');
-
-        // Advance the "seen" cursor for all messages immediately
-        lastTimestamp = newTimestamp;
-        saveState();
-
-        // Deduplicate by group
-        const messagesByGroup = new Map<string, NewMessage[]>();
-        for (const msg of messages) {
-          const existing = messagesByGroup.get(msg.chat_jid);
-          if (existing) {
-            existing.push(msg);
-          } else {
-            messagesByGroup.set(msg.chat_jid, [msg]);
-          }
-        }
-
-        for (const [chatJid, groupMessages] of messagesByGroup) {
-          const group = registeredGroups[chatJid];
-          if (!group) continue;
-
-          const channel = findChannel(channels, chatJid);
-          if (!channel) {
-            logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
-            continue;
-          }
-
-          const isMainGroup = group.isMain === true;
-          const needsTrigger = !isMainGroup && group.requiresTrigger !== false;
-
-          // For non-main groups, only act on trigger messages.
-          // Non-trigger messages accumulate in DB and get pulled as
-          // context when a trigger eventually arrives.
-          if (needsTrigger) {
-            const triggerPattern = getTriggerPattern(group.trigger);
-            const allowlistCfg = loadSenderAllowlist();
-            const hasTrigger = groupMessages.some(
-              (m) =>
-                triggerPattern.test(m.content.trim()) &&
-                (m.is_from_me ||
-                  isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
-            );
-            if (!hasTrigger) continue;
-          }
-
-          // Pull all messages since lastAgentTimestamp so non-trigger
-          // context that accumulated between triggers is included.
-          const allPending = getMessagesSince(
-            chatJid,
-            getOrRecoverCursor(chatJid),
-            ASSISTANT_NAME,
-            MAX_MESSAGES_PER_PROMPT,
-          );
-          const messagesToSend =
-            allPending.length > 0 ? allPending : groupMessages;
-          const formatted = formatMessages(messagesToSend, TIMEZONE);
-
-          if (queue.sendMessage(chatJid, formatted)) {
-            logger.debug(
-              { chatJid, count: messagesToSend.length },
-              'Piped messages to active container',
-            );
-            lastAgentTimestamp[chatJid] =
-              messagesToSend[messagesToSend.length - 1].timestamp;
-            saveState();
-            // Show typing indicator while the container processes the piped message
-            channel
-              .setTyping?.(chatJid, true)
-              ?.catch((err) =>
-                logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
-              );
-          } else {
-            // No active container — enqueue for a new one
-            queue.enqueueMessageCheck(chatJid);
-          }
-        }
+  const done = (async () => {
+    while (!messageLoopStopRequested) {
+      try {
+        await runMessageLoopIteration();
+      } catch (err) {
+        logger.error({ err }, 'Error in message loop');
       }
-    } catch (err) {
-      logger.error({ err }, 'Error in message loop');
+      if (messageLoopStopRequested) break;
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
     }
-    await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
-  }
+    messageLoopRunning = false;
+    messageLoopStopRequested = false;
+  })();
+
+  return {
+    stop() {
+      messageLoopStopRequested = true;
+    },
+    done,
+  };
 }
 
 /**
@@ -523,69 +557,39 @@ function ensureContainerSystemRunning(): void {
 }
 
 async function main(): Promise<void> {
+  await startNanoClawApp();
+}
+
+export async function startNanoClawApp(
+  options: StartNanoClawOptions = {},
+): Promise<NanoClawAppHandle> {
+  const {
+    registerSignalHandlers = true,
+    initializeDatabase = true,
+    startBackgroundLoops = true,
+  } = options;
+
   ensureContainerSystemRunning();
-  initDatabase();
-  logger.info('Database initialized');
+  if (initializeDatabase) {
+    initDatabase();
+    logger.info('Database initialized');
+  }
   loadState();
-  restoreRemoteControl();
-
-  // Start credential proxy (containers route API calls through this)
-  const proxyServer = await startCredentialProxy(
-    CREDENTIAL_PROXY_PORT,
-    PROXY_BIND_HOST,
-  );
-
-  // Graceful shutdown handlers
-  const shutdown = async (signal: string) => {
-    logger.info({ signal }, 'Shutdown signal received');
-    proxyServer.close();
-    await queue.shutdown(10000);
-    for (const ch of channels) await ch.disconnect();
-    process.exit(0);
-  };
-  process.on('SIGTERM', () => shutdown('SIGTERM'));
-  process.on('SIGINT', () => shutdown('SIGINT'));
+  channels.splice(0, channels.length);
+  queue = new GroupQueue();
 
   // Handle /remote-control and /remote-control-end commands
   async function handleRemoteControl(
-    command: string,
+    _command: string,
     chatJid: string,
-    msg: NewMessage,
   ): Promise<void> {
-    const group = registeredGroups[chatJid];
-    if (!group?.isMain) {
-      logger.warn(
-        { chatJid, sender: msg.sender },
-        'Remote control rejected: not main group',
-      );
-      return;
-    }
-
     const channel = findChannel(channels, chatJid);
     if (!channel) return;
-
-    if (command === '/remote-control') {
-      const result = await startRemoteControl(
-        msg.sender,
-        chatJid,
-        process.cwd(),
-      );
-      if (result.ok) {
-        await channel.sendMessage(chatJid, result.url);
-      } else {
-        await channel.sendMessage(
-          chatJid,
-          `Remote Control failed: ${result.error}`,
-        );
-      }
-    } else {
-      const result = stopRemoteControl();
-      if (result.ok) {
-        await channel.sendMessage(chatJid, 'Remote Control session ended.');
-      } else {
-        await channel.sendMessage(chatJid, result.error);
-      }
-    }
+    await channel.sendMessage(
+      chatJid,
+      'Remote Control is not supported in this GitHub Copilot build of NanoClaw.',
+    );
+    logger.info({ chatJid }, 'Rejected legacy remote control command');
   }
 
   // Channel callbacks (shared by all channels)
@@ -594,7 +598,7 @@ async function main(): Promise<void> {
       // Remote control commands — intercept before storage
       const trimmed = msg.content.trim();
       if (trimmed === '/remote-control' || trimmed === '/remote-control-end') {
-        handleRemoteControl(trimmed, chatJid, msg).catch((err) =>
+        handleRemoteControl(trimmed, chatJid).catch((err) =>
           logger.error({ err, chatJid }, 'Remote control command error'),
         );
         return;
@@ -645,68 +649,137 @@ async function main(): Promise<void> {
     await channel.connect();
   }
   if (channels.length === 0) {
-    logger.fatal('No channels connected');
-    process.exit(1);
+    throw new Error('No channels connected');
   }
 
   // Start subsystems (independently of connection handler)
-  startSchedulerLoop({
-    registeredGroups: () => registeredGroups,
-    getSessions: () => sessions,
-    queue,
-    onProcess: (groupJid, proc, containerName, groupFolder) =>
-      queue.registerProcess(groupJid, proc, containerName, groupFolder),
-    sendMessage: async (jid, rawText) => {
-      const channel = findChannel(channels, jid);
-      if (!channel) {
-        logger.warn({ jid }, 'No channel owns JID, cannot send message');
-        return;
-      }
-      const text = formatOutbound(rawText);
-      if (text) await channel.sendMessage(jid, text);
-    },
-  });
-  startIpcWatcher({
-    sendMessage: (jid, text) => {
-      const channel = findChannel(channels, jid);
-      if (!channel) throw new Error(`No channel for JID: ${jid}`);
-      return channel.sendMessage(jid, text);
-    },
-    registeredGroups: () => registeredGroups,
-    registerGroup,
-    syncGroups: async (force: boolean) => {
-      await Promise.all(
-        channels
-          .filter((ch) => ch.syncGroups)
-          .map((ch) => ch.syncGroups!(force)),
-      );
-    },
-    getAvailableGroups,
-    writeGroupsSnapshot: (gf, im, ag, rj) =>
-      writeGroupsSnapshot(gf, im, ag, rj),
-    onTasksChanged: () => {
-      const tasks = getAllTasks();
-      const taskRows = tasks.map((t) => ({
-        id: t.id,
-        groupFolder: t.group_folder,
-        prompt: t.prompt,
-        script: t.script || undefined,
-        schedule_type: t.schedule_type,
-        schedule_value: t.schedule_value,
-        status: t.status,
-        next_run: t.next_run,
-      }));
-      for (const group of Object.values(registeredGroups)) {
-        writeTasksSnapshot(group.folder, group.isMain === true, taskRows);
-      }
-    },
-  });
+  const scheduler = startBackgroundLoops
+    ? startSchedulerLoop({
+        registeredGroups: () => registeredGroups,
+        getSessions: () => sessions,
+        queue,
+        onProcess: (groupJid, proc, containerName, groupFolder) =>
+          queue.registerProcess(groupJid, proc, containerName, groupFolder),
+        sendMessage: async (jid, rawText) => {
+          const channel = findChannel(channels, jid);
+          if (!channel) {
+            logger.warn({ jid }, 'No channel owns JID, cannot send message');
+            return;
+          }
+          const text = formatOutbound(rawText);
+          if (text) await channel.sendMessage(jid, text);
+        },
+      })
+    : { stop() {} };
+  const ipcWatcher = startBackgroundLoops
+    ? startIpcWatcher({
+        sendMessage: (jid, text) => {
+          const channel = findChannel(channels, jid);
+          if (!channel) throw new Error(`No channel for JID: ${jid}`);
+          return channel.sendMessage(jid, text);
+        },
+        registeredGroups: () => registeredGroups,
+        registerGroup,
+        syncGroups: async (force: boolean) => {
+          await Promise.all(
+            channels
+              .filter((ch) => ch.syncGroups)
+              .map((ch) => ch.syncGroups!(force)),
+          );
+        },
+        getAvailableGroups,
+        writeGroupsSnapshot: (gf, im, ag, rj) =>
+          writeGroupsSnapshot(gf, im, ag, rj),
+        onTasksChanged: () => {
+          const tasks = getAllTasks();
+          const taskRows = tasks.map((t) => ({
+            id: t.id,
+            groupFolder: t.group_folder,
+            prompt: t.prompt,
+            script: t.script || undefined,
+            schedule_type: t.schedule_type,
+            schedule_value: t.schedule_value,
+            status: t.status,
+            next_run: t.next_run,
+          }));
+          for (const group of Object.values(registeredGroups)) {
+            writeTasksSnapshot(group.folder, group.isMain === true, taskRows);
+          }
+        },
+      })
+    : { stop() {} };
   queue.setProcessMessagesFn(processGroupMessages);
   recoverPendingMessages();
-  startMessageLoop().catch((err) => {
+  const messageLoop = startBackgroundLoops
+    ? startMessageLoop()
+    : { stop() {}, done: Promise.resolve() };
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string = 'shutdown') => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info({ signal }, 'Shutdown signal received');
+    scheduler.stop();
+    ipcWatcher.stop();
+    messageLoop.stop();
+    await messageLoop.done;
+    await queue.shutdown(10000);
+    for (const ch of channels.splice(0, channels.length)) {
+      await ch.disconnect();
+    }
+    if (registerSignalHandlers) {
+      process.off('SIGTERM', handleSigterm);
+      process.off('SIGINT', handleSigint);
+    }
+  };
+
+  const handleSigterm = () => {
+    shutdown('SIGTERM')
+      .then(() => process.exit(0))
+      .catch((err) => {
+        logger.fatal({ err }, 'Shutdown failed');
+        process.exit(1);
+      });
+  };
+  const handleSigint = () => {
+    shutdown('SIGINT')
+      .then(() => process.exit(0))
+      .catch((err) => {
+        logger.fatal({ err }, 'Shutdown failed');
+        process.exit(1);
+      });
+  };
+
+  if (registerSignalHandlers) {
+    process.on('SIGTERM', handleSigterm);
+    process.on('SIGINT', handleSigint);
+  }
+
+  messageLoop.done.catch((err) => {
     logger.fatal({ err }, 'Message loop crashed unexpectedly');
-    process.exit(1);
   });
+
+  return {
+    shutdown,
+    runMessageLoopOnce: runMessageLoopIteration,
+    runSchedulerOnce: () =>
+      runSchedulerIteration({
+        registeredGroups: () => registeredGroups,
+        getSessions: () => sessions,
+        queue,
+        onProcess: (groupJid, proc, containerName, groupFolder) =>
+          queue.registerProcess(groupJid, proc, containerName, groupFolder),
+        sendMessage: async (jid, rawText) => {
+          const channel = findChannel(channels, jid);
+          if (!channel) {
+            logger.warn({ jid }, 'No channel owns JID, cannot send message');
+            return;
+          }
+          const text = formatOutbound(rawText);
+          if (text) await channel.sendMessage(jid, text);
+        },
+      }),
+  };
 }
 
 // Guard: only run when executed directly, not when imported by tests

@@ -136,12 +136,12 @@ function waitForIpcMessage(): Promise<string | null> {
 
 /**
  * Build system message config for the session.
- * Loads global CLAUDE.md content for non-main groups.
+ * Loads global AGENTS.md content for non-main groups.
  */
 function buildSystemMessage(containerInput: ContainerInput): { mode: 'append'; content?: string } | undefined {
-  const globalClaudeMdPath = '/workspace/global/CLAUDE.md';
-  if (!containerInput.isMain && fs.existsSync(globalClaudeMdPath)) {
-    const content = fs.readFileSync(globalClaudeMdPath, 'utf-8');
+  const globalAgentsPath = '/workspace/global/AGENTS.md';
+  if (!containerInput.isMain && fs.existsSync(globalAgentsPath)) {
+    const content = fs.readFileSync(globalAgentsPath, 'utf-8');
     return { mode: 'append', content };
   }
   return undefined;
@@ -205,6 +205,7 @@ async function runQuery(
     workingDirectory: '/workspace/group',
     mcpServers,
     availableTools,
+    settingSources: ['project'],
     systemMessage,
   };
 
@@ -389,8 +390,8 @@ async function main(): Promise<void> {
     prompt = `[SCHEDULED TASK]\n\nScript output:\n${JSON.stringify(scriptResult.data, null, 2)}\n\nInstructions:\n${containerInput.prompt}`;
   }
 
-  // Create the Copilot client — uses GITHUB_TOKEN from env for auth,
-  // or falls back to gh CLI auth (useLoggedInUser: true by default).
+  // Create the Copilot client. NanoClaw's setup flow seeds /home/node/.copilot
+  // via `copilot login`, and the SDK reuses that stored signed-in user state.
   const client = new CopilotClient({
     logLevel: 'warning',
   });
