@@ -6,7 +6,11 @@ import { isValidTimezone } from './timezone.js';
 
 // Read config values from .env (falls back to process.env).
 // Interactive Copilot auth is stored separately under DATA_DIR/copilot-auth.
-const envConfig = readEnvFile(['ASSISTANT_NAME', 'ASSISTANT_HAS_OWN_NUMBER', 'TZ']);
+const envConfig = readEnvFile([
+  'ASSISTANT_NAME',
+  'ASSISTANT_HAS_OWN_NUMBER',
+  'TZ',
+]);
 
 export const ASSISTANT_NAME =
   process.env.ASSISTANT_NAME || envConfig.ASSISTANT_NAME || 'Andy';

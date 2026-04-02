@@ -479,7 +479,8 @@ export async function runMessageLoopIteration(): Promise<void> {
         { chatJid, count: messagesToSend.length },
         'Piped messages to active container',
       );
-      lastAgentTimestamp[chatJid] = messagesToSend[messagesToSend.length - 1].timestamp;
+      lastAgentTimestamp[chatJid] =
+        messagesToSend[messagesToSend.length - 1].timestamp;
       saveState();
       channel
         .setTyping?.(chatJid, true)

@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { registerChannel, _resetChannelRegistryForTests } from './channels/registry.js';
+import {
+  registerChannel,
+  _resetChannelRegistryForTests,
+} from './channels/registry.js';
 import {
   _getMessagesForChat,
   _initTestDatabase,
@@ -26,10 +29,9 @@ vi.mock('./container-runtime.js', () => ({
 }));
 
 vi.mock('./container-runner.js', async () => {
-  const actual =
-    await vi.importActual<typeof import('./container-runner.js')>(
-      './container-runner.js',
-    );
+  const actual = await vi.importActual<typeof import('./container-runner.js')>(
+    './container-runner.js',
+  );
   return {
     ...actual,
     runContainerAgent: (...args: Parameters<typeof actual.runContainerAgent>) =>

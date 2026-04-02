@@ -74,7 +74,10 @@ export async function processIpcOnce(deps: IpcDeps): Promise<void> {
             if (data.type === 'message' && data.chatJid && data.text) {
               // Authorization: verify this group can send to this chatJid
               const targetGroup = registeredGroups[data.chatJid];
-              if (isMain || (targetGroup && targetGroup.folder === sourceGroup)) {
+              if (
+                isMain ||
+                (targetGroup && targetGroup.folder === sourceGroup)
+              ) {
                 await deps.sendMessage(data.chatJid, data.text);
                 logger.info(
                   { chatJid: data.chatJid, sourceGroup },
@@ -95,18 +98,26 @@ export async function processIpcOnce(deps: IpcDeps): Promise<void> {
             );
             const errorDir = path.join(ipcBaseDir, 'errors');
             fs.mkdirSync(errorDir, { recursive: true });
-            fs.renameSync(filePath, path.join(errorDir, `${sourceGroup}-${file}`));
+            fs.renameSync(
+              filePath,
+              path.join(errorDir, `${sourceGroup}-${file}`),
+            );
           }
         }
       }
     } catch (err) {
-      logger.error({ err, sourceGroup }, 'Error reading IPC messages directory');
+      logger.error(
+        { err, sourceGroup },
+        'Error reading IPC messages directory',
+      );
     }
 
     // Process tasks from this group's IPC directory
     try {
       if (fs.existsSync(tasksDir)) {
-        const taskFiles = fs.readdirSync(tasksDir).filter((f) => f.endsWith('.json'));
+        const taskFiles = fs
+          .readdirSync(tasksDir)
+          .filter((f) => f.endsWith('.json'));
         for (const file of taskFiles) {
           const filePath = path.join(tasksDir, file);
           try {
@@ -115,10 +126,16 @@ export async function processIpcOnce(deps: IpcDeps): Promise<void> {
             await processTaskIpc(data, sourceGroup, isMain, deps);
             fs.unlinkSync(filePath);
           } catch (err) {
-            logger.error({ file, sourceGroup, err }, 'Error processing IPC task');
+            logger.error(
+              { file, sourceGroup, err },
+              'Error processing IPC task',
+            );
             const errorDir = path.join(ipcBaseDir, 'errors');
             fs.mkdirSync(errorDir, { recursive: true });
-            fs.renameSync(filePath, path.join(errorDir, `${sourceGroup}-${file}`));
+            fs.renameSync(
+              filePath,
+              path.join(errorDir, `${sourceGroup}-${file}`),
+            );
           }
         }
       }
@@ -451,9 +468,9 @@ export async function processTaskIpc(
           );
           break;
         }
-        // Defense in depth: agent cannot set isMain via IPC.                                                                                                                                    
-        // Preserve isMain from the existing registration so IPC config                                                                                                                          
-        // updates (e.g. adding additionalMounts) don't strip the flag.                                                                                                                          
+        // Defense in depth: agent cannot set isMain via IPC.
+        // Preserve isMain from the existing registration so IPC config
+        // updates (e.g. adding additionalMounts) don't strip the flag.
         const existingGroup = registeredGroups[data.jid];
         deps.registerGroup(data.jid, {
           name: data.name,
