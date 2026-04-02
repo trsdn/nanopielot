@@ -1,10 +1,9 @@
-<h1 align="center">🥧 NanoPieLot</h1>
-
 <p align="center">
-  <em>Easy as Pie.</em>
+  <img src="assets/banner.jpeg" alt="NanoPieLot" width="600">
 </p>
 
 <p align="center">
+  <em>Easy as Pie.</em><br>
   <a href="https://github.com/trsdn/nanoclaw">NanoClaw</a>, ported to the GitHub Copilot SDK — same claw, different cockpit. 🥧🧑‍✈️
 </p>
 
