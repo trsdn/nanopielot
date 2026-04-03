@@ -77,7 +77,7 @@ function setupLaunchd(
     homeDir,
     'Library',
     'LaunchAgents',
-    'com.nanoclaw.plist',
+    'com.nanopielot.plist',
   );
   fs.mkdirSync(path.dirname(plistPath), { recursive: true });
 
@@ -86,7 +86,7 @@ function setupLaunchd(
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.nanoclaw</string>
+    <string>com.nanopielot</string>
     <key>ProgramArguments</key>
     <array>
         <string>${nodePath}</string>
@@ -106,9 +106,9 @@ function setupLaunchd(
         <string>${homeDir}</string>
     </dict>
     <key>StandardOutPath</key>
-    <string>${projectRoot}/logs/nanoclaw.log</string>
+    <string>${projectRoot}/logs/nanopielot.log</string>
     <key>StandardErrorPath</key>
-    <string>${projectRoot}/logs/nanoclaw.error.log</string>
+    <string>${projectRoot}/logs/nanopielot.error.log</string>
 </dict>
 </plist>`;
 
@@ -128,7 +128,7 @@ function setupLaunchd(
   let serviceLoaded = false;
   try {
     const output = execSync('launchctl list', { encoding: 'utf-8' });
-    serviceLoaded = output.includes('com.nanoclaw');
+    serviceLoaded = output.includes('com.nanopielot');
   } catch {
     // launchctl list failed
   }
@@ -160,7 +160,7 @@ function setupLinux(
 }
 
 /**
- * Kill any orphaned nanoclaw node processes left from previous runs or debugging.
+ * Kill any orphaned nanopielot node processes left from previous runs or debugging.
  * Prevents connection conflicts when two instances connect to the same channel simultaneously.
  */
 function killOrphanedProcesses(projectRoot: string): void {
@@ -168,7 +168,7 @@ function killOrphanedProcesses(projectRoot: string): void {
     execSync(`pkill -f '${projectRoot}/dist/index\\.js' || true`, {
       stdio: 'ignore',
     });
-    logger.info('Stopped any orphaned nanoclaw processes');
+    logger.info('Stopped any orphaned nanopielot processes');
   } catch {
     // pkill not available or no orphans
   }
@@ -213,7 +213,7 @@ function setupSystemd(
   let systemctlPrefix: string;
 
   if (runningAsRoot) {
-    unitPath = '/etc/systemd/system/nanoclaw.service';
+    unitPath = '/etc/systemd/system/nanopielot.service';
     systemctlPrefix = 'systemctl';
     logger.info('Running as root — installing system-level systemd unit');
   } else {
@@ -229,12 +229,12 @@ function setupSystemd(
     }
     const unitDir = path.join(homeDir, '.config', 'systemd', 'user');
     fs.mkdirSync(unitDir, { recursive: true });
-    unitPath = path.join(unitDir, 'nanoclaw.service');
+    unitPath = path.join(unitDir, 'nanopielot.service');
     systemctlPrefix = 'systemctl --user';
   }
 
   const unit = `[Unit]
-Description=NanoClaw Personal Assistant
+Description=NanoPieLot Personal Assistant
 After=network.target
 
 [Service]
@@ -246,8 +246,8 @@ RestartSec=5
 KillMode=process
 Environment=HOME=${homeDir}
 Environment=PATH=/usr/local/bin:/usr/bin:/bin:${homeDir}/.local/bin
-StandardOutput=append:${projectRoot}/logs/nanoclaw.log
-StandardError=append:${projectRoot}/logs/nanoclaw.error.log
+StandardOutput=append:${projectRoot}/logs/nanopielot.log
+StandardError=append:${projectRoot}/logs/nanopielot.error.log
 
 [Install]
 WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
@@ -263,7 +263,7 @@ WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
     );
   }
 
-  // Kill orphaned nanoclaw processes to avoid channel connection conflicts
+  // Kill orphaned nanopielot processes to avoid channel connection conflicts
   killOrphanedProcesses(projectRoot);
 
   // Enable lingering so the user service survives SSH logout.
@@ -288,13 +288,13 @@ WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
   }
 
   try {
-    execSync(`${systemctlPrefix} enable nanoclaw`, { stdio: 'ignore' });
+    execSync(`${systemctlPrefix} enable nanopielot`, { stdio: 'ignore' });
   } catch (err) {
     logger.error({ err }, 'systemctl enable failed');
   }
 
   try {
-    execSync(`${systemctlPrefix} start nanoclaw`, { stdio: 'ignore' });
+    execSync(`${systemctlPrefix} start nanopielot`, { stdio: 'ignore' });
   } catch (err) {
     logger.error({ err }, 'systemctl start failed');
   }
@@ -302,7 +302,7 @@ WantedBy=${runningAsRoot ? 'multi-user.target' : 'default.target'}`;
   // Verify
   let serviceLoaded = false;
   try {
-    execSync(`${systemctlPrefix} is-active nanoclaw`, { stdio: 'ignore' });
+    execSync(`${systemctlPrefix} is-active nanopielot`, { stdio: 'ignore' });
     serviceLoaded = true;
   } catch {
     // Not active
@@ -328,12 +328,12 @@ function setupNohupFallback(
 ): void {
   logger.warn('No systemd detected — generating nohup wrapper script');
 
-  const wrapperPath = path.join(projectRoot, 'start-nanoclaw.sh');
-  const pidFile = path.join(projectRoot, 'nanoclaw.pid');
+  const wrapperPath = path.join(projectRoot, 'start-nanopielot.sh');
+  const pidFile = path.join(projectRoot, 'nanopielot.pid');
 
   const lines = [
     '#!/bin/bash',
-    '# start-nanoclaw.sh — Start NanoClaw without systemd',
+    '# start-nanopielot.sh — Start NanoPieLot without systemd',
     `# To stop: kill \\$(cat ${pidFile})`,
     '',
     'set -euo pipefail',
@@ -344,20 +344,20 @@ function setupNohupFallback(
     `if [ -f ${JSON.stringify(pidFile)} ]; then`,
     `  OLD_PID=$(cat ${JSON.stringify(pidFile)} 2>/dev/null || echo "")`,
     '  if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then',
-    '    echo "Stopping existing NanoClaw (PID $OLD_PID)..."',
+    '    echo "Stopping existing NanoPieLot (PID $OLD_PID)..."',
     '    kill "$OLD_PID" 2>/dev/null || true',
     '    sleep 2',
     '  fi',
     'fi',
     '',
-    'echo "Starting NanoClaw..."',
+    'echo "Starting NanoPieLot..."',
     `nohup ${JSON.stringify(nodePath)} ${JSON.stringify(projectRoot + '/dist/index.js')} \\`,
-    `  >> ${JSON.stringify(projectRoot + '/logs/nanoclaw.log')} \\`,
-    `  2>> ${JSON.stringify(projectRoot + '/logs/nanoclaw.error.log')} &`,
+    `  >> ${JSON.stringify(projectRoot + '/logs/nanopielot.log')} \\`,
+    `  2>> ${JSON.stringify(projectRoot + '/logs/nanopielot.error.log')} &`,
     '',
     `echo $! > ${JSON.stringify(pidFile)}`,
-    'echo "NanoClaw started (PID $!)"',
-    `echo "Logs: tail -f ${projectRoot}/logs/nanoclaw.log"`,
+    'echo "NanoPieLot started (PID $!)"',
+    `echo "Logs: tail -f ${projectRoot}/logs/nanopielot.log"`,
   ];
   const wrapper = lines.join('\n') + '\n';
 

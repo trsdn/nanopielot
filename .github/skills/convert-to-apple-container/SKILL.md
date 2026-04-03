@@ -5,7 +5,7 @@ description: Switch from Docker to Apple Container for macOS-native container is
 
 # Convert to Apple Container
 
-This skill switches NanoClaw's container runtime from Docker to Apple Container (macOS-only). It uses the skills engine for deterministic code changes, then walks through verification.
+This skill switches NanoPieLot's container runtime from Docker to Apple Container (macOS-only). It uses the skills engine for deterministic code changes, then walks through verification.
 
 **What this changes:**
 - Container runtime binary: `docker` → `container`
@@ -103,7 +103,7 @@ container system status || container system start
 ### Test basic execution
 
 ```bash
-echo '{}' | container run -i --entrypoint /bin/echo nanoclaw-agent:latest "Container OK"
+echo '{}' | container run -i --entrypoint /bin/echo nanopielot-agent:latest "Container OK"
 ```
 
 ### Test readonly mounts
@@ -112,7 +112,7 @@ echo '{}' | container run -i --entrypoint /bin/echo nanoclaw-agent:latest "Conta
 mkdir -p /tmp/test-ro && echo "test" > /tmp/test-ro/file.txt
 container run --rm --entrypoint /bin/bash \
   --mount type=bind,source=/tmp/test-ro,target=/test,readonly \
-  nanoclaw-agent:latest \
+  nanopielot-agent:latest \
   -c "cat /test/file.txt && touch /test/new.txt 2>&1 || echo 'Write blocked (expected)'"
 rm -rf /tmp/test-ro
 ```
@@ -125,7 +125,7 @@ Expected: Read succeeds, write fails with "Read-only file system".
 mkdir -p /tmp/test-rw
 container run --rm --entrypoint /bin/bash \
   -v /tmp/test-rw:/test \
-  nanoclaw-agent:latest \
+  nanopielot-agent:latest \
   -c "echo 'test write' > /test/new.txt && cat /test/new.txt"
 cat /tmp/test-rw/new.txt && rm -rf /tmp/test-rw
 ```
@@ -136,7 +136,7 @@ Expected: Both operations succeed.
 
 ```bash
 npm run build
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.nanopielot
 ```
 
 Send a message via WhatsApp and verify the agent responds.

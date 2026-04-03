@@ -1,11 +1,11 @@
 ---
 name: init-onecli
-description: Legacy skill retained for compatibility. The current NanoClaw base no longer uses OneCLI for authentication.
+description: Legacy skill retained for compatibility. The current NanoPieLot base no longer uses OneCLI for authentication.
 ---
 
 # Initialize OneCLI Agent Vault
 
-This skill is obsolete in the Copilot-based NanoClaw mainline.
+This skill is obsolete in the Copilot-based NanoPieLot mainline.
 
 The repository now authenticates through GitHub Copilot device login and no longer depends on OneCLI's Agent Vault. If you are following the base setup, do not install or configure OneCLI.
 

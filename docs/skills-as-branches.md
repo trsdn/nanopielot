@@ -2,9 +2,9 @@
 
 ## Overview
 
-This document covers **feature skills** — skills that add capabilities via git branch merges. This is the most complex skill type and the primary way NanoClaw is extended.
+This document covers **feature skills** — skills that add capabilities via git branch merges. This is the most complex skill type and the primary way NanoPieLot is extended.
 
-NanoClaw has four types of skills overall. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full taxonomy:
+NanoPieLot has four types of skills overall. See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full taxonomy:
 
 | Type | Location | How it works |
 |------|----------|-------------|
@@ -17,7 +17,7 @@ NanoClaw has four types of skills overall. See [CONTRIBUTING.md](../CONTRIBUTING
 
 Feature skills are distributed as git branches on the upstream repository. Applying a skill is a `git merge`. Updating core is a `git merge`. Everything is standard git.
 
-This replaces the previous `skills-engine/` system (three-way file merging, `.nanoclaw/` state, manifest files, replay, backup/restore) with plain git operations and Copilot-guided conflict resolution.
+This replaces the previous `skills-engine/` system (three-way file merging, `.nanopielot/` state, manifest files, replay, backup/restore) with plain git operations and Copilot-guided conflict resolution.
 
 ## How It Works
 
@@ -25,7 +25,7 @@ This replaces the previous `skills-engine/` system (three-way file merging, `.na
 
 The upstream repo (`trsdn/nanoclaw`) maintains:
 
-- `main` — core NanoClaw (no skill code)
+- `main` — core NanoPieLot (no skill code)
 - `skill/discord` — main + Discord integration
 - `skill/telegram` — main + Telegram integration
 - `skill/slack` — main + Slack integration
@@ -46,9 +46,9 @@ Skills are split into two categories:
 **Feature skills** (in marketplace, installed on demand):
 - `/add-discord`, `/add-telegram`, `/add-slack`, `/add-gmail`, etc.
 - Each has a SKILL.md with setup instructions and a corresponding `skill/*` branch with code
-- Live in the marketplace repo (`trsdn/nanoclaw-skills`)
+- Live in the marketplace repo (`trsdn/nanopielot-skills`)
 
-Users merge feature branches into their own fork or checkout; NanoClaw itself does not currently implement marketplace/plugin installation in app code.
+Users merge feature branches into their own fork or checkout; NanoPieLot itself does not currently implement marketplace/plugin installation in app code.
 
 ### Selective skill installation
 
@@ -63,29 +63,29 @@ Dependent skills (e.g., `telegram-swarm` depends on `telegram`) are only offered
 
 ### Marketplace configuration
 
-NanoClaw's repository skill configuration registers the official marketplace:
+NanoPieLot's repository skill configuration registers the official marketplace:
 
 ```json
 {
   "extraKnownMarketplaces": {
-    "nanoclaw-skills": {
+    "nanopielot-skills": {
       "source": {
         "source": "github",
-        "repo": "trsdn/nanoclaw-skills"
+        "repo": "trsdn/nanopielot-skills"
       }
     }
   }
 }
 ```
 
-If a marketplace repo exists, it is a distribution convention outside the core NanoClaw runtime:
+If a marketplace repo exists, it is a distribution convention outside the core NanoPieLot runtime:
 
 ```
-trsdn/nanoclaw-skills/
+trsdn/nanopielot-skills/
   marketplace/
     marketplace.json              # Catalog metadata
   plugins/
-    nanoclaw-skills/              # Single plugin bundling all official skills
+    nanopielot-skills/              # Single plugin bundling all official skills
       plugin.json                 # Plugin manifest
       skills/
         add-discord/
@@ -97,7 +97,7 @@ trsdn/nanoclaw-skills/
         ...
 ```
 
-Multiple skills are bundled in one plugin — installing `nanoclaw-skills` makes all feature skills available at once. Individual skills don't need separate installation.
+Multiple skills are bundled in one plugin — installing `nanopielot-skills` makes all feature skills available at once. Individual skills don't need separate installation.
 
 Each SKILL.md tells Copilot to merge the corresponding skill branch as step 1, then walks through interactive setup (env vars, bot creation, etc.).
 
@@ -208,8 +208,8 @@ A GitHub Action runs on every push to `main`:
 1. Fork `trsdn/nanoclaw` on GitHub (click the Fork button)
 2. Clone your fork:
    ```bash
-   git clone https://github.com/<you>/nanoclaw.git
-   cd nanoclaw
+   git clone https://github.com/<you>/nanopielot.git
+   cd nanopielot
    ```
 3. Run Copilot CLI:
    ```bash
@@ -227,7 +227,7 @@ Users who previously ran `git clone https://github.com/trsdn/nanoclaw.git` and h
 2. Reroute remotes:
    ```bash
    git remote rename origin upstream
-   git remote add origin https://github.com/<you>/nanoclaw.git
+   git remote add origin https://github.com/<you>/nanopielot.git
    git push --force origin main
    ```
    The `--force` is needed because the fresh fork's main is at upstream's latest, but the user wants their (possibly behind) version. The fork was just created so there's nothing to lose.
@@ -253,7 +253,7 @@ Users who previously applied skills via the `skills-engine/` system have skill c
 4. Claude assists by diffing your old fork against the new one to identify custom changes
 
 In both cases:
-- Delete the `.nanoclaw/` directory (no longer needed)
+- Delete the `.nanopielot/` directory (no longer needed)
 - The `skills-engine/` code will be removed from upstream once all skills are migrated
 - `/update-skills` only tracks skills applied via branch merge — old-engine skills won't appear in update checks
 
@@ -337,7 +337,7 @@ When a skill PR is reviewed and approved:
    ```
 2. Force-push to the contributor's PR branch, replacing it with a single commit that adds the contributor to `CONTRIBUTORS.md` (removing all code changes)
 3. Merge the slimmed PR into `main` (just the contributor addition)
-4. Add the skill's SKILL.md to the marketplace repo (`trsdn/nanoclaw-skills`)
+4. Add the skill's SKILL.md to the marketplace repo (`trsdn/nanopielot-skills`)
 
 This way:
 - The contributor gets merge credit (their PR is merged)
@@ -366,34 +366,34 @@ Anyone can maintain their own fork with skill branches and their own marketplace
 
 A community contributor:
 
-1. Maintains a fork of NanoClaw (e.g., `alice/nanoclaw`)
+1. Maintains a fork of NanoPieLot (e.g., `alice/nanopielot`)
 2. Creates `skill/*` branches on their fork with their custom skills
-3. Creates a marketplace repo (e.g., `alice/nanoclaw-skills`) with the expected marketplace metadata and plugin structure
+3. Creates a marketplace repo (e.g., `alice/nanopielot-skills`) with the expected marketplace metadata and plugin structure
 
 ### Adding a community marketplace
 
-If the community contributor is trusted, they can open a PR to add their marketplace to NanoClaw's repository skill configuration:
+If the community contributor is trusted, they can open a PR to add their marketplace to NanoPieLot's repository skill configuration:
 
 ```json
 {
   "extraKnownMarketplaces": {
-    "nanoclaw-skills": {
+    "nanopielot-skills": {
       "source": {
         "source": "github",
-        "repo": "trsdn/nanoclaw-skills"
+        "repo": "trsdn/nanopielot-skills"
       }
     },
-    "alice-nanoclaw-skills": {
+    "alice-nanopielot-skills": {
       "source": {
         "source": "github",
-        "repo": "alice/nanoclaw-skills"
+        "repo": "alice/nanopielot-skills"
       }
     }
   }
 }
 ```
 
-Once merged, all NanoClaw users automatically discover the community marketplace alongside the official one.
+Once merged, all NanoPieLot users automatically discover the community marketplace alongside the official one.
 
 ### Installing community skills
 
@@ -409,7 +409,7 @@ Users can also browse and install community plugins manually via `/plugin`.
 - **Multiple marketplaces coexist.** Users see skills from all trusted marketplaces in `/plugin`.
 - **Community skills use the same merge pattern.** The SKILL.md just points to a different remote:
   ```bash
-  git remote add alice https://github.com/alice/nanoclaw.git
+  git remote add alice https://github.com/alice/nanopielot.git
   git fetch alice skill/my-cool-feature
   git merge alice/skill/my-cool-feature
   ```
@@ -418,7 +418,7 @@ Users can also browse and install community plugins manually via `/plugin`.
 
 ## Flavors
 
-A flavor is a curated fork of NanoClaw — a combination of skills, custom changes, and configuration tailored for a specific use case (e.g., "NanoClaw for Sales," "NanoClaw Minimal," "NanoClaw for Developers").
+A flavor is a curated fork of NanoPieLot — a combination of skills, custom changes, and configuration tailored for a specific use case (e.g., "NanoPieLot for Sales," "NanoPieLot Minimal," "NanoPieLot for Developers").
 
 ### Creating a flavor
 
@@ -431,15 +431,15 @@ A flavor is a curated fork of NanoClaw — a combination of skills, custom chang
 
 During `/setup`, users are offered a choice of flavors before any configuration happens. The setup skill reads `flavors.yaml` from the repo (shipped with upstream, always up to date) and presents options:
 
-AskUserQuestion: "Start with a flavor or default NanoClaw?"
-- Default NanoClaw
-- NanoClaw for Sales — Gmail + Slack + CRM (maintained by alice)
-- NanoClaw Minimal — Telegram-only, lightweight (maintained by bob)
+AskUserQuestion: "Start with a flavor or default NanoPieLot?"
+- Default NanoPieLot
+- NanoPieLot for Sales — Gmail + Slack + CRM (maintained by alice)
+- NanoPieLot Minimal — Telegram-only, lightweight (maintained by bob)
 
 If a flavor is chosen:
 
 ```bash
-git remote add <flavor-name> https://github.com/alice/nanoclaw.git
+git remote add <flavor-name> https://github.com/alice/nanopielot.git
 git fetch <flavor-name> main
 git merge <flavor-name>/main
 ```
@@ -468,13 +468,13 @@ The flavor maintainer keeps their fork updated (merging upstream, updating skill
 
 ```yaml
 flavors:
-  - name: NanoClaw for Sales
-    repo: alice/nanoclaw
+  - name: NanoPieLot for Sales
+    repo: alice/nanopielot
     description: Gmail + Slack + CRM integration, daily pipeline summaries
     maintainer: alice
 
-  - name: NanoClaw Minimal
-    repo: bob/nanoclaw
+  - name: NanoPieLot Minimal
+    repo: bob/nanopielot
     description: Telegram-only, no container overhead
     maintainer: bob
 ```
@@ -485,7 +485,7 @@ Anyone can PR to add their flavor. The file is available locally when `/setup` r
 
 - **During setup** — flavor selection is offered as part of the initial setup flow
 - **`/browse-flavors` skill** — reads `flavors.yaml` and presents options at any time
-- **GitHub topics** — flavor forks can tag themselves with `nanoclaw-flavor` for searchability
+- **GitHub topics** — flavor forks can tag themselves with `nanopielot-flavor` for searchability
 - **Discord / website** — community-curated lists
 
 ## Migration
@@ -516,7 +516,7 @@ Migration from the old skills engine to branches is complete. All feature skills
 - `scripts/fix-skill-drift.ts`, `scripts/validate-all-skills.ts`
 - `.github/workflows/skill-drift.yml`, `.github/workflows/skill-pr.yml`
 - All `add/`, `modify/`, `tests/`, and `manifest.yaml` from skill directories
-- `.nanoclaw/` state directory
+- `.nanopielot/` state directory
 
 Operational skills (`setup`, `debug`, `update-nanoclaw`, `customize`, `update-skills`) remain on main in `.github/skills/`.
 
@@ -527,15 +527,15 @@ Operational skills (`setup`, `debug`, `update-nanoclaw`, `customize`, `update-sk
 Before:
 ```bash
 git clone https://github.com/trsdn/nanoclaw.git
-cd NanoClaw
+cd NanoPieLot
 claude
 ```
 
 After:
 ```
 1. Fork trsdn/nanoclaw on GitHub
-2. git clone https://github.com/<you>/nanoclaw.git
-3. cd nanoclaw
+2. git clone https://github.com/<you>/nanopielot.git
+3. cd nanopielot
 4. claude
 5. /setup
 ```
@@ -557,10 +557,10 @@ Marketplace configuration so the official marketplace is auto-registered:
 ```json
 {
   "extraKnownMarketplaces": {
-    "nanoclaw-skills": {
+    "nanopielot-skills": {
       "source": {
         "source": "github",
-        "repo": "trsdn/nanoclaw-skills"
+        "repo": "trsdn/nanopielot-skills"
       }
     }
   }
@@ -579,7 +579,7 @@ The following can be removed:
 - `scripts/uninstall-skill.ts`
 - `scripts/fix-skill-drift.ts`
 - `scripts/validate-all-skills.ts`
-- `.nanoclaw/` — state directory
+- `.nanopielot/` — state directory
 - `add/` and `modify/` subdirectories from all skill directories
 - Feature skill SKILL.md files from `.github/skills/` on main (they now live in the marketplace)
 
@@ -587,7 +587,7 @@ Operational skills (`setup`, `debug`, `update-nanoclaw`, `customize`, `update-sk
 
 ### New infrastructure
 
-- **Marketplace repo** (`trsdn/nanoclaw-skills`) — single Copilot CLI plugin bundling SKILL.md files for all feature skills
+- **Marketplace repo** (`trsdn/nanopielot-skills`) — single Copilot CLI plugin bundling SKILL.md files for all feature skills
 - **CI GitHub Action** — merge-forward `main` into all `skill/*` branches on every push to `main`, using Claude (Haiku) for conflict resolution
 - **`/update-skills` skill** — checks for and applies skill branch updates using git history
 - **`CONTRIBUTORS.md`** — tracks skill contributors
@@ -625,13 +625,13 @@ Users only need to re-merge a skill branch if the skill itself was updated (not 
 
 > **Skills are now git branches**
 >
-> We've simplified how skills work in NanoClaw. Instead of a custom skills engine, skills are now git branches that you merge in.
+> We've simplified how skills work in NanoPieLot. Instead of a custom skills engine, skills are now git branches that you merge in.
 >
 > **What this means for you:**
 > - Applying a skill: `git fetch upstream skill/discord && git merge upstream/skill/discord`
 > - Updating core: `git fetch upstream main && git merge upstream/main`
 > - Checking for skill updates: `/update-skills`
-> - No more `.nanoclaw/` state directory or skills engine
+> - No more `.nanopielot/` state directory or skills engine
 >
 > **We now recommend forking instead of cloning.** This gives you a remote to push your customizations to.
 >
@@ -640,12 +640,12 @@ Users only need to re-merge a skill branch if the skill itself was updated (not 
 > 2. Run:
 >    ```
 >    git remote rename origin upstream
->    git remote add origin https://github.com/<you>/nanoclaw.git
+>    git remote add origin https://github.com/<you>/nanopielot.git
 >    git push --force origin main
 >    ```
 >    This works even if you're way behind — just push your current state.
 >
-> **If you previously applied skills via the old system**, your code changes are already in your working tree — nothing to redo. You can delete the `.nanoclaw/` directory. Future skills and updates use the branch-based approach.
+> **If you previously applied skills via the old system**, your code changes are already in your working tree — nothing to redo. You can delete the `.nanopielot/` directory. Future skills and updates use the branch-based approach.
 >
 > **Discovering skills:** Skills are now available through Copilot CLI's plugin marketplace. Run `/plugin` in Copilot CLI to browse and install available skills.
 
@@ -660,4 +660,4 @@ Users only need to re-merge a skill branch if the skill itself was updated (not 
 >
 > That's it. We'll create a `skill/<name>` branch from your PR, add you to CONTRIBUTORS.md, and add the SKILL.md to the marketplace. CI automatically keeps skill branches merged-forward with `main` using Claude to resolve any conflicts.
 >
-> **Want to run your own skill marketplace?** Maintain skill branches on your fork and create a marketplace repo. Open a PR to add it to NanoClaw's auto-discovered marketplaces — or users can add it manually via `/plugin marketplace add`.
+> **Want to run your own skill marketplace?** Maintain skill branches on your fork and create a marketplace repo. Open a PR to add it to NanoPieLot's auto-discovered marketplaces — or users can add it manually via `/plugin marketplace add`.

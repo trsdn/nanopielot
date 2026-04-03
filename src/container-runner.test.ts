@@ -3,17 +3,17 @@ import { EventEmitter } from 'events';
 import { PassThrough } from 'stream';
 
 // Sentinel markers must match container-runner.ts
-const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
-const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
+const OUTPUT_START_MARKER = '---NANOPIELOT_OUTPUT_START---';
+const OUTPUT_END_MARKER = '---NANOPIELOT_OUTPUT_END---';
 
 // Mock config
 vi.mock('./config.js', () => ({
-  CONTAINER_IMAGE: 'nanoclaw-agent:latest',
+  CONTAINER_IMAGE: 'nanopielot-agent:latest',
   CONTAINER_MAX_OUTPUT_SIZE: 10485760,
   CONTAINER_TIMEOUT: 1800000, // 30min
-  COPILOT_AUTH_DIR: '/tmp/nanoclaw-test-copilot-auth',
-  DATA_DIR: '/tmp/nanoclaw-test-data',
-  GROUPS_DIR: '/tmp/nanoclaw-test-groups',
+  COPILOT_AUTH_DIR: '/tmp/nanopielot-test-copilot-auth',
+  DATA_DIR: '/tmp/nanopielot-test-data',
+  GROUPS_DIR: '/tmp/nanopielot-test-groups',
   IDLE_TIMEOUT: 1800000, // 30min
   TIMEZONE: 'America/Los_Angeles',
 }));

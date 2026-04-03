@@ -1,4 +1,4 @@
-# NanoClaw
+# NanoPieLot
 
 Personal Copilot assistant. See [README.md](README.md) for philosophy and setup. See [docs/REQUIREMENTS.md](docs/REQUIREMENTS.md) for architecture decisions.
 
@@ -23,11 +23,11 @@ Single Node.js process with skill-based channel system. Channels (WhatsApp, Tele
 
 ## Secrets / Credentials / Copilot Login
 
-NanoClaw uses a persistent Copilot device-login session stored under `data/copilot-auth/` and mounted into containers at `/home/node/.copilot`. Setup establishes that session with `copilot login` inside an isolated container, so you do not need to commit raw GitHub tokens into `.env`.
+NanoPieLot uses a persistent Copilot device-login session stored under `data/copilot-auth/` and mounted into containers at `/home/node/.copilot`. Setup establishes that session with `copilot login` inside an isolated container, so you do not need to commit raw GitHub tokens into `.env`.
 
 ## Skills
 
-Four types of skills exist in NanoClaw. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full taxonomy and guidelines.
+Four types of skills exist in NanoPieLot. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full taxonomy and guidelines.
 
 - **Feature skills** — merge a `skill/*` branch to add capabilities (e.g. `/add-telegram`, `/add-slack`)
 - **Utility skills** — ship code files alongside SKILL.md (e.g. `/claw`)
@@ -60,14 +60,14 @@ npm run build        # Compile TypeScript
 Service management:
 ```bash
 # macOS (launchd)
-launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw  # restart
+launchctl load ~/Library/LaunchAgents/com.nanopielot.plist
+launchctl unload ~/Library/LaunchAgents/com.nanopielot.plist
+launchctl kickstart -k gui/$(id -u)/com.nanopielot  # restart
 
 # Linux (systemd)
-systemctl --user start nanoclaw
-systemctl --user stop nanoclaw
-systemctl --user restart nanoclaw
+systemctl --user start nanopielot
+systemctl --user stop nanopielot
+systemctl --user restart nanopielot
 ```
 
 ## Troubleshooting

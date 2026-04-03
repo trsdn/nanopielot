@@ -18,7 +18,7 @@ import {
 import {
   _resetAppStateForTests,
   runMessageLoopIteration,
-  startNanoClawApp,
+  startNanoPieLotApp,
 } from './index.js';
 import type { Channel, RegisteredGroup } from './types.js';
 
@@ -159,7 +159,7 @@ describe('app e2e flow', () => {
       },
     );
 
-    const app = await startNanoClawApp({
+    const app = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,
@@ -238,7 +238,7 @@ describe('app e2e flow', () => {
         },
       );
 
-    const firstApp = await startNanoClawApp({
+    const firstApp = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,
@@ -259,7 +259,7 @@ describe('app e2e flow', () => {
     _resetChannelRegistryForTests();
     registerFakeChannel();
 
-    const secondApp = await startNanoClawApp({
+    const secondApp = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,
@@ -312,7 +312,7 @@ describe('app e2e flow', () => {
       },
     );
 
-    const app = await startNanoClawApp({
+    const app = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,
@@ -389,7 +389,7 @@ describe('app e2e flow', () => {
       created_at: new Date('2026-04-02T08:59:00.000Z').toISOString(),
     });
 
-    const app = await startNanoClawApp({
+    const app = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,
@@ -405,7 +405,7 @@ describe('app e2e flow', () => {
   });
 
   it('lets the owner inspect and change the model per group', async () => {
-    const app = await startNanoClawApp({
+    const app = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,
@@ -445,7 +445,7 @@ describe('app e2e flow', () => {
   });
 
   it('rejects /model from non-owner messages', async () => {
-    const app = await startNanoClawApp({
+    const app = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,
@@ -471,7 +471,7 @@ describe('app e2e flow', () => {
   });
 
   it('lists the live Copilot models for the signed-in account', async () => {
-    const app = await startNanoClawApp({
+    const app = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,
@@ -500,7 +500,7 @@ describe('app e2e flow', () => {
   });
 
   it('clears the persisted session when changing the model', async () => {
-    const app = await startNanoClawApp({
+    const app = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,

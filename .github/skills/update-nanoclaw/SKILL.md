@@ -50,7 +50,7 @@ Only opens files with actual conflicts. Uses `git log`, `git diff`, and `git sta
 ---
 
 # Goal
-Help a user with a customized NanoClaw install safely incorporate upstream changes without a fresh reinstall and without blowing tokens.
+Help a user with a customized NanoPieLot install safely incorporate upstream changes without a fresh reinstall and without blowing tokens.
 
 # Operating principles
 - Never proceed with a dirty working tree.
@@ -231,7 +231,7 @@ Tell the user:
 - To rollback: `git reset --hard <backup-tag-from-step-1>`
 - Backup branch also exists: `backup/pre-update-<HASH>-<TIMESTAMP>`
 - Restart the service to apply changes:
-  - If using launchd: `launchctl unload ~/Library/LaunchAgents/com.nanoclaw.plist && launchctl load ~/Library/LaunchAgents/com.nanoclaw.plist`
+  - If using launchd: `launchctl unload ~/Library/LaunchAgents/com.nanopielot.plist && launchctl load ~/Library/LaunchAgents/com.nanopielot.plist`
   - If running manually: restart `npm run dev`
 
 

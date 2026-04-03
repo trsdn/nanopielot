@@ -1,5 +1,5 @@
 /**
- * NanoClaw Agent Runner (Copilot SDK)
+ * NanoPieLot Agent Runner (Copilot SDK)
  * Runs inside a container, receives config via stdin, outputs result to stdout
  *
  * Input protocol:
@@ -57,8 +57,8 @@ async function readStdin(): Promise<string> {
   });
 }
 
-const OUTPUT_START_MARKER = '---NANOCLAW_OUTPUT_START---';
-const OUTPUT_END_MARKER = '---NANOCLAW_OUTPUT_END---';
+const OUTPUT_START_MARKER = '---NANOPIELOT_OUTPUT_START---';
+const OUTPUT_END_MARKER = '---NANOPIELOT_OUTPUT_END---';
 
 function writeOutput(output: ContainerOutput): void {
   console.log(OUTPUT_START_MARKER);
@@ -149,17 +149,17 @@ function buildSystemMessage(containerInput: ContainerInput): { mode: 'append'; c
 }
 
 /**
- * Build the MCP server configuration for the nanoclaw tools.
+ * Build the MCP server configuration for the nanopielot tools.
  */
 function buildMcpServers(mcpServerPath: string, containerInput: ContainerInput): Record<string, MCPLocalServerConfig> {
   return {
-    nanoclaw: {
+    nanopielot: {
       command: 'node',
       args: [mcpServerPath],
       env: {
-        NANOCLAW_CHAT_JID: containerInput.chatJid,
-        NANOCLAW_GROUP_FOLDER: containerInput.groupFolder,
-        NANOCLAW_IS_MAIN: containerInput.isMain ? '1' : '0',
+        NANOPIELOT_CHAT_JID: containerInput.chatJid,
+        NANOPIELOT_GROUP_FOLDER: containerInput.groupFolder,
+        NANOPIELOT_IS_MAIN: containerInput.isMain ? '1' : '0',
       },
       tools: ['*'],
     },
@@ -178,7 +178,7 @@ function buildAvailableTools(): string[] {
     'Agent',
     'TodoWrite', 'ToolSearch', 'Skill',
     'NotebookEdit',
-    'mcp__nanoclaw__*',
+    'mcp__nanopielot__*',
   ];
 }
 
@@ -392,7 +392,7 @@ async function main(): Promise<void> {
     prompt = `[SCHEDULED TASK]\n\nScript output:\n${JSON.stringify(scriptResult.data, null, 2)}\n\nInstructions:\n${containerInput.prompt}`;
   }
 
-  // Create the Copilot client. NanoClaw's setup flow seeds /home/node/.copilot
+  // Create the Copilot client. NanoPieLot's setup flow seeds /home/node/.copilot
   // via `copilot login`, and the SDK reuses that stored signed-in user state.
   const client = new CopilotClient({
     logLevel: 'warning',

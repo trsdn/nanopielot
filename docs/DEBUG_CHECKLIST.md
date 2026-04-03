@@ -1,4 +1,4 @@
-# NanoClaw Debug Checklist
+# NanoPieLot Debug Checklist
 
 ## Known Issues (2026-02-08)
 
@@ -11,11 +11,11 @@ Both timers fire at the same time, so containers always exit via hard SIGKILL (c
 ### 3. Cursor advanced before agent succeeds
 `processGroupMessages` advances `lastAgentTimestamp` before the agent runs. If the container times out, retries find no messages (cursor already past them). Messages are permanently lost on timeout.
 
-### 4. Kubernetes image garbage collection deletes nanoclaw-agent image
+### 4. Kubernetes image garbage collection deletes nanopielot-agent image
 
-**Symptoms**: `Container exited with code 125: pull access denied for nanoclaw-agent` — the container image disappears overnight or after a few hours, even though you just built it.
+**Symptoms**: `Container exited with code 125: pull access denied for nanopielot-agent` — the container image disappears overnight or after a few hours, even though you just built it.
 
-**Cause**: If your container runtime has Kubernetes enabled (Rancher Desktop enables it by default), the kubelet runs image garbage collection when disk usage exceeds 85%. NanoClaw containers are ephemeral (run and exit), so `nanoclaw-agent:latest` is never protected by a running container. The kubelet sees it as unused and deletes it — often overnight when no messages are being processed. Other images (docker-compose services) survive because they have long-running containers referencing them.
+**Cause**: If your container runtime has Kubernetes enabled (Rancher Desktop enables it by default), the kubelet runs image garbage collection when disk usage exceeds 85%. NanoPieLot containers are ephemeral (run and exit), so `nanopielot-agent:latest` is never protected by a running container. The kubelet sees it as unused and deletes it — often overnight when no messages are being processed. Other images (docker-compose services) survive because they have long-running containers referencing them.
 
 **Fix**: Disable Kubernetes if you don't need it:
 ```bash
@@ -28,13 +28,13 @@ rdctl set --kubernetes-enabled=false
 
 **Diagnosis**: Check the k3s log for image GC activity:
 ```bash
-grep -i "nanoclaw" ~/Library/Logs/rancher-desktop/k3s.log
-# Look for: "Removing image to free bytes" with the nanoclaw-agent image ID
+grep -i "nanopielot" ~/Library/Logs/rancher-desktop/k3s.log
+# Look for: "Removing image to free bytes" with the nanopielot-agent image ID
 ```
 
-Check NanoClaw logs for image status:
+Check NanoPieLot logs for image status:
 ```bash
-grep -E "image found|image NOT found|image missing" logs/nanoclaw.log
+grep -E "image found|image NOT found|image missing" logs/nanopielot.log
 ```
 
 If you need Kubernetes enabled, set `CONTAINER_IMAGE` to an image stored in a registry that the kubelet won't GC, or raise the GC thresholds.
@@ -43,23 +43,23 @@ If you need Kubernetes enabled, set `CONTAINER_IMAGE` to an image stored in a re
 
 ```bash
 # 1. Is the service running?
-launchctl list | grep nanoclaw
-# Expected: PID  0  com.nanoclaw (PID = running, "-" = not running, non-zero exit = crashed)
+launchctl list | grep nanopielot
+# Expected: PID  0  com.nanopielot (PID = running, "-" = not running, non-zero exit = crashed)
 
 # 2. Any running containers?
-docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+docker ps --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanopielot
 
 # 3. Any stopped/orphaned containers?
-docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanoclaw
+docker ps -a --format '{{.Names}} {{.Status}}' 2>/dev/null | grep nanopielot
 
 # 4. Recent errors in service log?
-grep -E 'ERROR|WARN' logs/nanoclaw.log | tail -20
+grep -E 'ERROR|WARN' logs/nanopielot.log | tail -20
 
 # 5. Are channels connected? (look for last connection event)
-grep -E 'Connected|Connection closed|connection.*close|channel.*ready' logs/nanoclaw.log | tail -5
+grep -E 'Connected|Connection closed|connection.*close|channel.*ready' logs/nanopielot.log | tail -5
 
 # 6. Are groups loaded?
-grep 'groupCount' logs/nanoclaw.log | tail -3
+grep 'groupCount' logs/nanopielot.log | tail -3
 ```
 
 ## Session Transcript Branching
@@ -90,7 +90,7 @@ for i, line in enumerate(lines):
 
 ```bash
 # Check for recent timeouts
-grep -E 'Container timeout|timed out' logs/nanoclaw.log | tail -10
+grep -E 'Container timeout|timed out' logs/nanopielot.log | tail -10
 
 # Check container log files for the timed-out container
 ls -lt groups/*/logs/container-*.log | head -10
@@ -99,23 +99,23 @@ ls -lt groups/*/logs/container-*.log | head -10
 cat groups/<group>/logs/container-<timestamp>.log
 
 # Check if retries were scheduled and what happened
-grep -E 'Scheduling retry|retry|Max retries' logs/nanoclaw.log | tail -10
+grep -E 'Scheduling retry|retry|Max retries' logs/nanopielot.log | tail -10
 ```
 
 ## Agent Not Responding
 
 ```bash
 # Check if messages are being received from channels
-grep 'New messages' logs/nanoclaw.log | tail -10
+grep 'New messages' logs/nanopielot.log | tail -10
 
 # Check if messages are being processed (container spawned)
-grep -E 'Processing messages|Spawning container' logs/nanoclaw.log | tail -10
+grep -E 'Processing messages|Spawning container' logs/nanopielot.log | tail -10
 
 # Check if messages are being piped to active container
-grep -E 'Piped messages|sendMessage' logs/nanoclaw.log | tail -10
+grep -E 'Piped messages|sendMessage' logs/nanopielot.log | tail -10
 
 # Check the queue state — any active containers?
-grep -E 'Starting container|Container active|concurrency limit' logs/nanoclaw.log | tail -10
+grep -E 'Starting container|Container active|concurrency limit' logs/nanopielot.log | tail -10
 
 # Check lastAgentTimestamp vs latest message timestamp
 sqlite3 store/messages.db "SELECT chat_jid, MAX(timestamp) as latest FROM messages GROUP BY chat_jid ORDER BY latest DESC LIMIT 5;"
@@ -125,24 +125,24 @@ sqlite3 store/messages.db "SELECT chat_jid, MAX(timestamp) as latest FROM messag
 
 ```bash
 # Check mount validation logs (shows on container spawn)
-grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanoclaw.log | tail -10
+grep -E 'Mount validated|Mount.*REJECTED|mount' logs/nanopielot.log | tail -10
 
 # Verify the mount allowlist is readable
-cat ~/.config/nanoclaw/mount-allowlist.json
+cat ~/.config/nanopielot/mount-allowlist.json
 
 # Check group's container_config in DB
 sqlite3 store/messages.db "SELECT name, container_config FROM registered_groups;"
 
 # Test-run a container to check mounts (dry run)
 # Replace <group-folder> with the group's folder name
-docker run -i --rm --entrypoint ls nanoclaw-agent:latest /workspace/extra/
+docker run -i --rm --entrypoint ls nanopielot-agent:latest /workspace/extra/
 ```
 
 ## Channel Auth Issues
 
 ```bash
 # Check if QR code was requested (means auth expired)
-grep 'QR\|authentication required\|qr' logs/nanoclaw.log | tail -5
+grep 'QR\|authentication required\|qr' logs/nanopielot.log | tail -5
 
 # Check auth files exist
 ls -la store/auth/
@@ -155,17 +155,17 @@ npm run auth
 
 ```bash
 # Restart the service
-launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+launchctl kickstart -k gui/$(id -u)/com.nanopielot
 
 # View live logs
-tail -f logs/nanoclaw.log
+tail -f logs/nanopielot.log
 
 # Stop the service (careful — running containers are detached, not killed)
-launchctl bootout gui/$(id -u)/com.nanoclaw
+launchctl bootout gui/$(id -u)/com.nanopielot
 
 # Start the service
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanoclaw.plist
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.nanopielot.plist
 
 # Rebuild after code changes
-npm run build && launchctl kickstart -k gui/$(id -u)/com.nanoclaw
+npm run build && launchctl kickstart -k gui/$(id -u)/com.nanopielot
 ```

@@ -29,7 +29,7 @@ Forks and skill branches carry applied code changes. Users merge them into their
 ## Forward merge procedure
 
 ```bash
-# In your local nanoclaw checkout
+# In your local nanopielot checkout
 git checkout main && git pull
 
 # For a fork:
@@ -71,7 +71,7 @@ After any main change that touches shared files (`package.json`, `src/index.ts`,
 
 When creating a new channel fork:
 
-1. Fork `nanoclaw` to `nanoclaw-{channel}`
+1. Fork `nanopielot` to `nanopielot-{channel}`
 2. Remove upstream-only workflows: `bump-version.yml`, `update-tokens.yml`
 3. Add channel code, deps, env vars
 4. Forward-merge main immediately to establish a clean baseline

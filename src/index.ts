@@ -100,14 +100,14 @@ export interface MessageLoopHandle {
   done: Promise<void>;
 }
 
-export interface NanoClawAppHandle {
+export interface NanoPieLotAppHandle {
   shutdown(signal?: string): Promise<void>;
   runMessageLoopOnce(): Promise<void>;
   runSchedulerOnce(): Promise<void>;
   receiveMessage(chatJid: string, msg: NewMessage): Promise<void>;
 }
 
-export interface StartNanoClawOptions {
+export interface StartNanoPieLotOptions {
   registerSignalHandlers?: boolean;
   initializeDatabase?: boolean;
   startBackgroundLoops?: boolean;
@@ -535,7 +535,7 @@ export function startMessageLoop(): MessageLoopHandle {
   messageLoopRunning = true;
   messageLoopStopRequested = false;
 
-  logger.info(`NanoClaw running (default trigger: ${DEFAULT_TRIGGER})`);
+  logger.info(`NanoPieLot running (default trigger: ${DEFAULT_TRIGGER})`);
 
   const done = (async () => {
     while (!messageLoopStopRequested) {
@@ -587,12 +587,12 @@ function ensureContainerSystemRunning(): void {
 }
 
 async function main(): Promise<void> {
-  await startNanoClawApp();
+  await startNanoPieLotApp();
 }
 
-export async function startNanoClawApp(
-  options: StartNanoClawOptions = {},
-): Promise<NanoClawAppHandle> {
+export async function startNanoPieLotApp(
+  options: StartNanoPieLotOptions = {},
+): Promise<NanoPieLotAppHandle> {
   const {
     registerSignalHandlers = true,
     initializeDatabase = true,
@@ -617,7 +617,7 @@ export async function startNanoClawApp(
     if (!channel) return;
     await channel.sendMessage(
       chatJid,
-      'Remote Control is not supported in this GitHub Copilot build of NanoClaw.',
+      'Remote Control is not supported in this GitHub Copilot build of NanoPieLot.',
     );
     logger.info({ chatJid }, 'Rejected legacy remote control command');
   }
@@ -913,7 +913,7 @@ const isDirectRun =
 
 if (isDirectRun) {
   main().catch((err) => {
-    logger.error({ err }, 'Failed to start NanoClaw');
+    logger.error({ err }, 'Failed to start NanoPieLot');
     process.exit(1);
   });
 }

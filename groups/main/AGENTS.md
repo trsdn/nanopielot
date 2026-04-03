@@ -16,7 +16,7 @@ You are Andy, a personal assistant. You help with tasks, answer questions, and c
 
 Your output is sent to the user or group.
 
-You also have `mcp__nanoclaw__send_message` which sends a message immediately while you're still working. This is useful when you want to acknowledge a request before starting longer work.
+You also have `mcp__nanopielot__send_message` which sends a message immediately while you're still working. This is useful when you want to acknowledge a request before starting longer work.
 
 ### Internal thoughts
 
@@ -79,7 +79,7 @@ This is the **main channel**, which has elevated privileges.
 
 ## Authentication
 
-NanoClaw uses GitHub Copilot's signed-in-user flow. Run `/setup`, complete the one-time `copilot login` device flow, and NanoClaw will persist that auth state under `data/copilot-auth/` for reuse inside agent containers. Do not add raw GitHub tokens to the repo unless you are intentionally customizing the auth model.
+NanoPieLot uses GitHub Copilot's signed-in-user flow. Run `/setup`, complete the one-time `copilot login` device flow, and NanoPieLot will persist that auth state under `data/copilot-auth/` for reuse inside agent containers. Do not add raw GitHub tokens to the repo unless you are intentionally customizing the auth model.
 
 ## Container Mounts
 
@@ -221,7 +221,7 @@ After registering a group, explain the sender allowlist feature to the user:
 >
 > For closed groups with trusted members, I recommend setting up an allow-only list so only specific people can trigger me. Want me to configure that?
 
-If the user wants to set up an allowlist, edit `~/.config/nanoclaw/sender-allowlist.json` on the host:
+If the user wants to set up an allowlist, edit `~/.config/nanopielot/sender-allowlist.json` on the host:
 
 ```json
 {
@@ -239,7 +239,7 @@ If the user wants to set up an allowlist, edit `~/.config/nanoclaw/sender-allowl
 Notes:
 - Your own messages (`is_from_me`) explicitly bypass the allowlist in trigger checks. Bot messages are filtered out by the database query before trigger evaluation, so they never reach the allowlist.
 - If the config file doesn't exist or is invalid, all senders are allowed (fail-open)
-- The config file is on the host at `~/.config/nanoclaw/sender-allowlist.json`, not inside the container
+- The config file is on the host at `~/.config/nanopielot/sender-allowlist.json`, not inside the container
 
 ### Removing a Group
 

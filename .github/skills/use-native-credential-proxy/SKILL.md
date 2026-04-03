@@ -1,11 +1,11 @@
 ---
 name: use-native-credential-proxy
-description: Legacy skill retained for compatibility. The current NanoClaw base now uses GitHub Copilot device login instead of the old native credential proxy.
+description: Legacy skill retained for compatibility. The current NanoPieLot base now uses GitHub Copilot device login instead of the old native credential proxy.
 ---
 
 # Use Native Credential Proxy
 
-This skill is obsolete in the Copilot-based NanoClaw mainline.
+This skill is obsolete in the Copilot-based NanoPieLot mainline.
 
 The current repository no longer ships the native credential proxy or the OneCLI migration path. Authentication is handled by a persistent GitHub Copilot device-login session stored under `data/copilot-auth/` and mounted into agent containers.
 

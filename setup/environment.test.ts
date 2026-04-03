@@ -78,7 +78,7 @@ describe('registered groups DB query', () => {
 describe('copilot auth detection', () => {
   it('detects a populated Copilot config directory', () => {
     const authDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'nanoclaw-copilot-auth-'),
+      path.join(os.tmpdir(), 'nanopielot-copilot-auth-'),
     );
     fs.writeFileSync(path.join(authDir, 'config.json'), '{"accounts":[]}');
 
@@ -89,7 +89,7 @@ describe('copilot auth detection', () => {
 
   it('returns false when auth directory is empty', () => {
     const authDir = fs.mkdtempSync(
-      path.join(os.tmpdir(), 'nanoclaw-copilot-auth-'),
+      path.join(os.tmpdir(), 'nanopielot-copilot-auth-'),
     );
 
     expect(hasCopilotAuth(authDir)).toBe(false);

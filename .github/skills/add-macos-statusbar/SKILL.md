@@ -1,11 +1,11 @@
 ---
 name: add-macos-statusbar
-description: Add a macOS menu bar status indicator for NanoClaw. Shows a bolt icon with a green/red dot indicating whether NanoClaw is running, with Start, Stop, and Restart controls. macOS only.
+description: Add a macOS menu bar status indicator for NanoPieLot. Shows a bolt icon with a green/red dot indicating whether NanoPieLot is running, with Start, Stop, and Restart controls. macOS only.
 ---
 
 # Add macOS Menu Bar Status Indicator
 
-Adds a persistent menu bar icon that shows NanoClaw's running status and lets the user
+Adds a persistent menu bar icon that shows NanoPieLot's running status and lets the user
 start, stop, or restart the service — similar to how Docker Desktop appears in the menu bar.
 
 **macOS only.** Requires Xcode Command Line Tools (`swiftc`).
@@ -37,7 +37,7 @@ If not found, tell the user:
 ### Check if already installed
 
 ```bash
-launchctl list | grep com.nanoclaw.statusbar
+launchctl list | grep com.nanopielot.statusbar
 ```
 
 If it returns a PID (not `-`), tell the user it's already installed and skip to Phase 3 (Verify).
@@ -70,7 +70,7 @@ pwd
 echo $HOME
 ```
 
-Create `~/Library/LaunchAgents/com.nanoclaw.statusbar.plist`, substituting the actual values
+Create `~/Library/LaunchAgents/com.nanopielot.statusbar.plist`, substituting the actual values
 for `{PROJECT_ROOT}` and `{HOME}`:
 
 ```xml
@@ -79,7 +79,7 @@ for `{PROJECT_ROOT}` and `{HOME}`:
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.nanoclaw.statusbar</string>
+    <string>com.nanopielot.statusbar</string>
     <key>ProgramArguments</key>
     <array>
         <string>{PROJECT_ROOT}/dist/statusbar</string>
@@ -104,30 +104,30 @@ for `{PROJECT_ROOT}` and `{HOME}`:
 ### Load the service
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.nanoclaw.statusbar.plist
+launchctl load ~/Library/LaunchAgents/com.nanopielot.statusbar.plist
 ```
 
 ## Phase 3: Verify
 
 ```bash
-launchctl list | grep com.nanoclaw.statusbar
+launchctl list | grep com.nanopielot.statusbar
 ```
 
 The first column should show a PID (not `-`).
 
 Tell the user:
 
-> The bolt icon should now appear in your macOS menu bar. Click it to see NanoClaw's status and control the service.
+> The bolt icon should now appear in your macOS menu bar. Click it to see NanoPieLot's status and control the service.
 >
-> - **Green dot** — NanoClaw is running
-> - **Red dot** — NanoClaw is stopped
+> - **Green dot** — NanoPieLot is running
+> - **Red dot** — NanoPieLot is stopped
 >
 > Use **Restart** after making code changes, and **View Logs** to open the log file directly.
 
 ## Removal
 
 ```bash
-launchctl unload ~/Library/LaunchAgents/com.nanoclaw.statusbar.plist
-rm ~/Library/LaunchAgents/com.nanoclaw.statusbar.plist
+launchctl unload ~/Library/LaunchAgents/com.nanopielot.statusbar.plist
+rm ~/Library/LaunchAgents/com.nanopielot.statusbar.plist
 rm dist/statusbar
 ```

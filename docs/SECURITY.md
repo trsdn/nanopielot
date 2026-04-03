@@ -1,4 +1,4 @@
-# NanoClaw Security Model
+# NanoPieLot Security Model
 
 ## Trust Model
 
@@ -23,7 +23,7 @@ This is the primary security boundary. Rather than relying on application-level 
 
 ### 2. Mount Security
 
-**External Allowlist** - Mount permissions stored at `~/.config/nanoclaw/mount-allowlist.json`, which is:
+**External Allowlist** - Mount permissions stored at `~/.config/nanopielot/mount-allowlist.json`, which is:
 - Outside project root
 - Never mounted into containers
 - Cannot be modified by agents
@@ -66,7 +66,7 @@ Messages and task operations are verified against group identity:
 
 ### 5. Credential Isolation (Copilot Device Login)
 
-NanoClaw does not require raw GitHub tokens in the repository. Instead, setup performs a one-time `copilot login` device flow inside an isolated container and persists the resulting Copilot CLI state under `data/copilot-auth/`.
+NanoPieLot does not require raw GitHub tokens in the repository. Instead, setup performs a one-time `copilot login` device flow inside an isolated container and persists the resulting Copilot CLI state under `data/copilot-auth/`.
 
 **How it works:**
 1. Setup runs `copilot login` in a disposable container with `data/copilot-auth/` mounted to `/home/node/.copilot`
