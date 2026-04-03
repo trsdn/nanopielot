@@ -17,4 +17,4 @@ The repository now authenticates through GitHub Copilot device login and no long
 
 ## When this still matters
 
-Only use OneCLI in a separate custom fork that has intentionally reintroduced that dependency. The main `trsdn/nanoclaw` branch should stay on the Copilot auth path.
+Only use OneCLI in a separate custom fork that has intentionally reintroduced that dependency. The main `trsdn/nanopielot` branch should stay on the Copilot auth path.

@@ -65,13 +65,11 @@ Common causes:
 
 #### Missing Authentication
 ```
-Invalid API key · Please run /login
+Authentication required
 ```
-**Fix:** Ensure `.env` file exists with either OAuth token or API key:
+**Fix:** Run `copilot login` to authenticate via the device flow. Auth state is stored in `data/copilot-auth/`:
 ```bash
-cat .env  # Should show one of:
-# CLAUDE_CODE_OAUTH_TOKEN=sk-ant-oat01-...  (subscription)
-# ANTHROPIC_API_KEY=sk-ant-api03-...        (pay-per-use)
+ls data/copilot-auth/  # Should contain auth state files
 ```
 
 #### Root User Restriction
@@ -84,14 +82,14 @@ cat .env  # Should show one of:
 
 **Runtime note:** Environment variables passed via `-e` may be lost when using `-i` (interactive/piped stdin).
 
-**Workaround:** The system extracts only authentication variables (`CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_API_KEY`) from `.env` and mounts them for sourcing inside the container. Other env vars are not exposed.
+**Workaround:** The system mounts the Copilot auth state from `data/copilot-auth/` into the container. Other env vars are not exposed.
 
-To verify env vars are reaching the container:
+To verify auth state is reaching the container:
 ```bash
 echo '{}' | docker run -i \
-  -v $(pwd)/data/env:/workspace/env-dir:ro \
+  -v $(pwd)/data/copilot-auth:/workspace/copilot-auth:ro \
   --entrypoint /bin/bash nanopielot-agent:latest \
-  -c 'export $(cat /workspace/env-dir/env | xargs); echo "OAuth: ${#CLAUDE_CODE_OAUTH_TOKEN} chars, API: ${#ANTHROPIC_API_KEY} chars"'
+  -c 'ls -la /workspace/copilot-auth/ && echo "Auth files present"'
 ```
 
 ### 3. Mount Issues
@@ -115,7 +113,7 @@ docker run --rm --entrypoint /bin/bash nanopielot-agent:latest -c 'ls -la /works
 Expected structure:
 ```
 /workspace/
-├── env-dir/env           # Environment file (CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY)
+├── copilot-auth/         # Copilot auth state (from copilot login device flow)
 ├── group/                # Current group folder (cwd)
 ├── project/              # Project root (main channel only)
 ├── global/               # Global AGENTS.md (non-main only)
@@ -323,10 +321,10 @@ Run this to check common issues:
 echo "=== Checking NanoPieLot Container Setup ==="
 
 echo -e "\n1. Authentication configured?"
-[ -f .env ] && (grep -q "CLAUDE_CODE_OAUTH_TOKEN=sk-" .env || grep -q "ANTHROPIC_API_KEY=sk-" .env) && echo "OK" || echo "MISSING - add CLAUDE_CODE_OAUTH_TOKEN or ANTHROPIC_API_KEY to .env"
+[ -d data/copilot-auth ] && [ "$(ls -A data/copilot-auth 2>/dev/null)" ] && echo "OK" || echo "MISSING - run copilot login to authenticate"
 
-echo -e "\n2. Env file copied for container?"
-[ -f data/env/env ] && echo "OK" || echo "MISSING - will be created on first run"
+echo -e "\n2. Auth state available for container?"
+[ -d data/copilot-auth ] && echo "OK" || echo "MISSING - will be created on first copilot login"
 
 echo -e "\n3. Container runtime running?"
 docker info &>/dev/null && echo "OK" || echo "NOT RUNNING - start Docker Desktop (macOS) or sudo systemctl start docker (Linux)"

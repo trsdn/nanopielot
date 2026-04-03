@@ -32,7 +32,7 @@ git remote -v
 If `discord` is missing, add it:
 
 ```bash
-git remote add discord https://github.com/trsdn/nanoclaw-discord.git
+git remote add discord https://github.com/trsdn/nanopielot-discord.git
 ```
 
 ### Merge the skill branch

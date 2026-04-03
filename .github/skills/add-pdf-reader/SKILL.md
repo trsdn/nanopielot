@@ -23,7 +23,7 @@ git remote -v
 If `whatsapp` is missing, add it:
 
 ```bash
-git remote add whatsapp https://github.com/trsdn/nanoclaw-whatsapp.git
+git remote add whatsapp https://github.com/trsdn/nanopielot-whatsapp.git
 ```
 
 ### Merge the skill branch

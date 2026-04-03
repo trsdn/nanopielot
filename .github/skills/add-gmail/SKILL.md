@@ -33,7 +33,7 @@ git remote -v
 If `gmail` is missing, add it:
 
 ```bash
-git remote add gmail https://github.com/trsdn/nanoclaw-gmail.git
+git remote add gmail https://github.com/trsdn/nanopielot-gmail.git
 ```
 
 ### Merge the skill branch

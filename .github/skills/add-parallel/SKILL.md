@@ -66,14 +66,9 @@ grep "PARALLEL_API_KEY" .env | head -c 50
 
 Add `PARALLEL_API_KEY` to allowed environment variables in `src/container-runner.ts`:
 
-Find the line:
+Find the `allowedVars` array and add `'PARALLEL_API_KEY'` to it:
 ```typescript
-const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY'];
-```
-
-Replace with:
-```typescript
-const allowedVars = ['CLAUDE_CODE_OAUTH_TOKEN', 'ANTHROPIC_API_KEY', 'PARALLEL_API_KEY'];
+const allowedVars = ['PARALLEL_API_KEY'];
 ```
 
 ### 4. Configure MCP Servers in Agent Runner

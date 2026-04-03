@@ -1,17 +1,17 @@
 ---
 name: update-nanoclaw
-description: Efficiently bring upstream NanoClaw updates into a customized install, with preview, selective cherry-pick, and low token usage.
+description: Efficiently bring upstream NanoPieLot updates into a customized install, with preview, selective cherry-pick, and low token usage.
 ---
 
 # About
 
-Your NanoClaw fork drifts from upstream as you customize it. This skill pulls upstream changes into your install without losing your modifications.
+Your NanoPieLot fork drifts from upstream as you customize it. This skill pulls upstream changes into your install without losing your modifications.
 
 Run `/update-nanoclaw` in Copilot CLI.
 
 ## How it works
 
-**Preflight**: checks for clean working tree (`git status --porcelain`). If `upstream` remote is missing, asks you for the URL (defaults to `https://github.com/trsdn/nanoclaw.git`) and adds it. Detects the upstream branch name (`main` or `master`).
+**Preflight**: checks for clean working tree (`git status --porcelain`). If `upstream` remote is missing, asks you for the URL (defaults to `https://github.com/trsdn/nanopielot.git`) and adds it. Detects the upstream branch name (`main` or `master`).
 
 **Backup**: creates a timestamped backup branch and tag (`backup/pre-update-<hash>-<timestamp>`, `pre-update-<hash>-<timestamp>`) before touching anything. Safe to run multiple times.
 
@@ -68,7 +68,7 @@ If output is non-empty:
 Confirm remotes:
 - `git remote -v`
 If `upstream` is missing:
-- Ask the user for the upstream repo URL (default: `https://github.com/trsdn/nanoclaw.git`).
+- Ask the user for the upstream repo URL (default: `https://github.com/trsdn/nanopielot.git`).
 - Add it: `git remote add upstream <user-provided-url>`
 - Then: `git fetch upstream --prune`
 

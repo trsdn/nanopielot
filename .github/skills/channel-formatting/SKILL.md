@@ -37,11 +37,11 @@ If `already applied`, skip to Phase 3 (Verify).
 git remote -v
 ```
 
-If an `upstream` remote pointing to `https://github.com/trsdn/nanoclaw.git` is missing,
+If an `upstream` remote pointing to `https://github.com/trsdn/nanopielot.git` is missing,
 add it:
 
 ```bash
-git remote add upstream https://github.com/trsdn/nanoclaw.git
+git remote add upstream https://github.com/trsdn/nanopielot.git
 ```
 
 ### Merge the skill branch

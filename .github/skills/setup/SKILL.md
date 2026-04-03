@@ -18,13 +18,13 @@ Check the git remote configuration to ensure the user has a fork and upstream is
 Run:
 - `git remote -v`
 
-**Case A — `origin` points to `trsdn/nanoclaw` (user cloned directly):**
+**Case A — `origin` points to `trsdn/nanopielot` (user cloned directly):**
 
 The user cloned instead of forking. AskUserQuestion: "You cloned NanoPieLot directly. We recommend forking so you can push your customizations. Would you like to set up a fork?"
 - Fork now (recommended) — walk them through it
 - Continue without fork — they'll only have local changes
 
-If fork: instruct the user to fork `trsdn/nanoclaw` on GitHub (they need to do this in their browser), then ask them for their GitHub username. Run:
+If fork: instruct the user to fork `trsdn/nanopielot` on GitHub (they need to do this in their browser), then ask them for their GitHub username. Run:
 ```bash
 git remote rename origin upstream
 git remote add origin https://github.com/<their-username>/nanopielot.git
@@ -34,21 +34,21 @@ Verify with `git remote -v`.
 
 If continue without fork: add upstream so they can still pull updates:
 ```bash
-git remote add upstream https://github.com/trsdn/nanoclaw.git
+git remote add upstream https://github.com/trsdn/nanopielot.git
 ```
 
 **Case B — `origin` points to user's fork, no `upstream` remote:**
 
 Add upstream:
 ```bash
-git remote add upstream https://github.com/trsdn/nanoclaw.git
+git remote add upstream https://github.com/trsdn/nanopielot.git
 ```
 
 **Case C — both `origin` (user's fork) and `upstream` (qwibitai) exist:**
 
 Already configured. Continue.
 
-**Verify:** `git remote -v` should show `origin` → user's repo, `upstream` → `trsdn/nanoclaw.git`.
+**Verify:** `git remote -v` should show `origin` → user's repo, `upstream` → `trsdn/nanopielot.git`.
 
 ## 1. Bootstrap (Node.js + Dependencies)
 
