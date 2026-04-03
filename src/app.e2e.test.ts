@@ -444,16 +444,17 @@ describe('app e2e flow', () => {
     expect(runContainerAgentMock).not.toHaveBeenCalled();
   });
 
-  it('rejects /model from non-owner messages', async () => {
+  it('rejects /model from non-owner in non-main group', async () => {
+    registerSecondaryGroup();
     const app = await startNanoPieLotApp({
       registerSignalHandlers: false,
       initializeDatabase: false,
       startBackgroundLoops: false,
     });
 
-    await app.receiveMessage('fake:main', {
+    await app.receiveMessage('fake:team', {
       id: 'm1',
-      chat_jid: 'fake:main',
+      chat_jid: 'fake:team',
       sender: 'user-1',
       sender_name: 'User One',
       content: '/model gpt-5.4',
@@ -462,9 +463,9 @@ describe('app e2e flow', () => {
     });
     await app.shutdown('model-command-non-owner');
 
-    expect(getGroupModel('main')).toBeUndefined();
+    expect(getGroupModel('team')).toBeUndefined();
     expect(sentMessages).toContainEqual({
-      jid: 'fake:main',
+      jid: 'fake:team',
       text: 'Only the bot owner can change or inspect the model.',
     });
     expect(runContainerAgentMock).not.toHaveBeenCalled();

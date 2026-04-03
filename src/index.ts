@@ -634,7 +634,9 @@ export async function startNanoPieLotApp(
     const channel = findChannel(channels, chatJid);
     if (!group || !channel) return true;
 
-    if (!msg.is_from_me) {
+    // Owner check: WhatsApp uses is_from_me (bot = your phone),
+    // Telegram/other channels use isMain (main group = owner's chat)
+    if (!msg.is_from_me && !group.isMain) {
       await channel.sendMessage(
         chatJid,
         'Only the bot owner can change or inspect the model.',
