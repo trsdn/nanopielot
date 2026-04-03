@@ -54,6 +54,8 @@ Single Node.js process. Channels self-register at startup. Agents run in isolate
 
 NanoPieLot wouldn't exist without [NanoClaw](https://github.com/qwibitai/nanoclaw). The original project's philosophy, architecture, and skill system are the foundation of everything here. We just swapped the engine. 🥧
 
+Forked from upstream commit [`a3fb3be`](https://github.com/qwibitai/nanoclaw/commit/a3fb3beb6ac28757e0a3dbe3b64862cd4839f8ce) (2026-03-28).
+
 ## License
 
 MIT — see [LICENSE](LICENSE)
