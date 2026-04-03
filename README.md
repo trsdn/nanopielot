@@ -4,17 +4,17 @@
 
 <p align="center">
   <em>Easy as Pie.</em><br>
-  <a href="https://github.com/trsdn/nanoclaw">NanoClaw</a>, ported to the GitHub Copilot SDK — same claw, different cockpit. 🥧🧑‍✈️
+  <a href="https://github.com/AskYous/nanoclaw">NanoClaw</a>, ported to the GitHub Copilot SDK — same claw, different cockpit. 🥧🧑‍✈️
 </p>
 
 ---
 
 ## What Changed from NanoClaw
 
-NanoPieLot is a full port of [NanoClaw](https://github.com/trsdn/nanoclaw) from Anthropic/Claude to the GitHub Copilot SDK:
+NanoPieLot is a full port of [NanoClaw](https://github.com/AskYous/nanoclaw) from Anthropic/Claude to the GitHub Copilot SDK:
 
 - **Any Copilot model.** `/model list` to see what's available, `/model <id>` to switch. GPT-4.1, Claude, Gemini — whatever your GitHub plan gives you.
-- **Same architecture.** Everything else works exactly like [NanoClaw](https://github.com/trsdn/nanoclaw): containers, channels, skills, groups, scheduling.
+- **Same architecture.** Everything else works exactly like [NanoClaw](https://github.com/AskYous/nanoclaw): containers, channels, skills, groups, scheduling.
 - Authentication via `copilot login` device flow.
 
 ## Quick Start
@@ -46,7 +46,7 @@ Single Node.js process. Channels self-register at startup. Agents run in isolate
 
 ## Special Thanks
 
-NanoPieLot wouldn't exist without [NanoClaw](https://github.com/trsdn/nanoclaw) by [Gavriel](https://github.com/AskYous). The original project's philosophy, architecture, and skill system are the foundation of everything here. We just swapped the engine. 🥧
+NanoPieLot wouldn't exist without [NanoClaw](https://github.com/AskYous/nanoclaw) by [Gavriel](https://github.com/AskYous). The original project's philosophy, architecture, and skill system are the foundation of everything here. We just swapped the engine. 🥧
 
 ## License
 
