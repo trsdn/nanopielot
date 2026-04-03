@@ -2,19 +2,28 @@
   <img src="assets/banner.jpeg" alt="NanoPieLot" width="600">
 </p>
 
+<h3 align="center">🥧 Easy as Pie.</h3>
+
 <p align="center">
-  <em>Easy as Pie.</em><br>
-  <a href="https://github.com/trsdn/nanoclaw">NanoClaw</a>, ported to the GitHub Copilot SDK — same claw, different cockpit. 🥧🧑‍✈️
+  <a href="https://github.com/qwibitai/nanoclaw">NanoClaw</a>, ported to the GitHub Copilot SDK — same claw, different cockpit. 🧑‍✈️
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/runtime-GitHub_Copilot_SDK-blue?logo=github" alt="Copilot SDK">
+  <img src="https://img.shields.io/badge/auth-device_login-green?logo=github" alt="Device Login">
+  <img src="https://img.shields.io/badge/models-live_switching-orange" alt="Live Model Switching">
+  <img src="https://img.shields.io/badge/isolation-container_sandboxed-purple?logo=docker" alt="Container Isolation">
+  <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT License">
 </p>
 
 ---
 
 ## What Changed from NanoClaw
 
-NanoPieLot is a full port of [NanoClaw](https://github.com/trsdn/nanoclaw) from Anthropic/Claude to the GitHub Copilot SDK:
+NanoPieLot is a full port of [NanoClaw](https://github.com/qwibitai/nanoclaw) from Anthropic/Claude to the GitHub Copilot SDK:
 
 - **Any Copilot model.** `/model list` to see what's available, `/model <id>` to switch. GPT-4.1, Claude, Gemini — whatever your GitHub plan gives you.
-- **Same architecture.** Everything else works exactly like [NanoClaw](https://github.com/trsdn/nanoclaw): containers, channels, skills, groups, scheduling.
+- **Same architecture.** Everything else works exactly like [NanoClaw](https://github.com/qwibitai/nanoclaw): containers, channels, skills, groups, scheduling.
 - Authentication via `copilot login` device flow.
 
 ## Quick Start
