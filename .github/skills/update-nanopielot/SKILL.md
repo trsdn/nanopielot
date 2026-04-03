@@ -1,5 +1,5 @@
 ---
-name: update-nanoclaw
+name: update-nanopielot
 description: Efficiently bring upstream NanoPieLot updates into a customized install, with preview, selective cherry-pick, and low token usage.
 ---
 
@@ -7,7 +7,7 @@ description: Efficiently bring upstream NanoPieLot updates into a customized ins
 
 Your NanoPieLot fork drifts from upstream as you customize it. This skill pulls upstream changes into your install without losing your modifications.
 
-Run `/update-nanoclaw` in Copilot CLI.
+Run `/update-nanopielot` in Copilot CLI.
 
 ## How it works
 
