@@ -9,9 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/auth-device_login-green?logo=github" alt="Device Login">
-  <img src="https://img.shields.io/badge/models-live_switching-orange" alt="Live Model Switching">
-  <img src="https://img.shields.io/badge/isolation-container_sandboxed-purple?logo=docker" alt="Container Isolation">
+  <img src="https://img.shields.io/badge/runtime-GitHub_Copilot_SDK-blue?logo=github" alt="Copilot SDK">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT License">
 </p>
 
