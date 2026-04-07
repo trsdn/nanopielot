@@ -19,6 +19,7 @@ import path from 'path';
 import { execFile } from 'child_process';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
 import type { CopilotSession, ResumeSessionConfig, SessionConfig, MCPLocalServerConfig } from '@github/copilot-sdk';
+import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 
 interface ContainerInput {
@@ -75,6 +76,11 @@ interface ToolConfigurationWarning {
   unknownTools?: string[];
 }
 
+interface CopilotSdkVersionInfo {
+  expectedVersion?: string;
+  actualVersion?: string;
+}
+
 function parseToolList(value: string): string[] {
   return value
     .split(',')
@@ -118,6 +124,80 @@ function logToolConfigurationWarning(message: string): void {
     } else {
       log(`Unknown tool names reported by SDK: ${message}`);
     }
+  }
+}
+
+function isExactVersionPin(version: string): boolean {
+  return /^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(
+    version,
+  );
+}
+
+export function buildCopilotSdkCompatibilityWarning(
+  expectedVersion: string | undefined,
+  actualVersion: string | undefined,
+): string | undefined {
+  if (!expectedVersion) {
+    return 'WARNING: Could not verify pinned @github/copilot-sdk version from agent-runner/package.json.';
+  }
+
+  if (!isExactVersionPin(expectedVersion)) {
+    return `WARNING: @github/copilot-sdk is not pinned to an exact version in agent-runner/package.json (${expectedVersion}).`;
+  }
+
+  if (!actualVersion) {
+    return 'WARNING: Could not determine the loaded @github/copilot-sdk version at runtime.';
+  }
+
+  if (expectedVersion !== actualVersion) {
+    return `WARNING: Loaded @github/copilot-sdk version ${actualVersion} does not match pinned version ${expectedVersion}. Review SDK compatibility before deploying upgrades.`;
+  }
+
+  return undefined;
+}
+
+function readCopilotSdkVersionInfo(): CopilotSdkVersionInfo {
+  let expectedVersion: string | undefined;
+  let actualVersion: string | undefined;
+
+  try {
+    const packageJsonPath = fileURLToPath(new URL('../package.json', import.meta.url));
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8')) as {
+      dependencies?: Record<string, unknown>;
+    };
+    const configuredVersion = packageJson.dependencies?.['@github/copilot-sdk'];
+    if (typeof configuredVersion === 'string') {
+      expectedVersion = configuredVersion;
+    }
+  } catch {
+    expectedVersion = undefined;
+  }
+
+  try {
+    const require = createRequire(import.meta.url);
+    const sdkPackageJsonPath = require.resolve('@github/copilot-sdk/package.json');
+    const sdkPackageJson = JSON.parse(fs.readFileSync(sdkPackageJsonPath, 'utf-8')) as {
+      version?: unknown;
+    };
+    if (typeof sdkPackageJson.version === 'string') {
+      actualVersion = sdkPackageJson.version;
+    }
+  } catch {
+    actualVersion = undefined;
+  }
+
+  return { expectedVersion, actualVersion };
+}
+
+export function logCopilotSdkCompatibilityWarning(
+  versionInfo: CopilotSdkVersionInfo = readCopilotSdkVersionInfo(),
+): void {
+  const warning = buildCopilotSdkCompatibilityWarning(
+    versionInfo.expectedVersion,
+    versionInfo.actualVersion,
+  );
+  if (warning) {
+    log(warning);
   }
 }
 
@@ -473,6 +553,7 @@ export async function runAgentRunner(): Promise<void> {
   // via `copilot login`, and the SDK reuses that stored signed-in user state.
   // cwd must point to the group workspace so the CLI discovers AGENTS.md
   // and project-level settings from the working directory.
+  logCopilotSdkCompatibilityWarning();
   const client = createCopilotClient();
 
   try {
