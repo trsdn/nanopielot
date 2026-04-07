@@ -206,7 +206,6 @@ async function runQuery(
     workingDirectory: '/workspace/group',
     mcpServers,
     availableTools,
-    settingSources: ['project'],
     systemMessage,
     ...(containerInput.model ? { model: containerInput.model } : {}),
   };
@@ -394,8 +393,11 @@ async function main(): Promise<void> {
 
   // Create the Copilot client. NanoPieLot's setup flow seeds /home/node/.copilot
   // via `copilot login`, and the SDK reuses that stored signed-in user state.
+  // cwd must point to the group workspace so the CLI discovers AGENTS.md
+  // and project-level settings from the working directory.
   const client = new CopilotClient({
     logLevel: 'warning',
+    cwd: '/workspace/group',
   });
 
   try {
