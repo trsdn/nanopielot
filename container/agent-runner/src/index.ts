@@ -198,10 +198,7 @@ async function runQuery(
   let session: CopilotSession;
 
   const baseConfig = {
-    onPermissionRequest: (...args: Parameters<typeof approveAll>) => {
-      log(`[permission] Tool permission requested: ${JSON.stringify(args[0]).slice(0, 300)}`);
-      return approveAll(...args);
-    },
+    onPermissionRequest: approveAll,
     workingDirectory: '/workspace/group',
     mcpServers,
     ...(availableTools ? { availableTools } : {}),
@@ -249,23 +246,7 @@ async function runQuery(
   // Subscribe to events for logging
   session.on((event) => {
     if (event.type === 'assistant.message_delta') return; // too noisy
-
-    // Verbose logging for key diagnostic events
-    if (event.type === 'session.tools_updated') {
-      const data = (event as unknown as { data?: { tools?: Array<{ name: string }> } }).data;
-      const tools = data?.tools;
-      if (tools) {
-        log(`[event] ${event.type} — ${tools.length} tools: ${tools.map(t => t.name).join(', ')}`);
-      } else {
-        log(`[event] ${event.type} — data: ${JSON.stringify(data ?? {}).slice(0, 500)}`);
-      }
-    } else if (event.type === 'session.info' || event.type === 'session.mcp_server_status_changed') {
-      log(`[event] ${event.type} — ${JSON.stringify((event as unknown as { data?: unknown }).data ?? {}).slice(0, 300)}`);
-    } else if (event.type.includes('tool')) {
-      log(`[event] ${event.type} — ${JSON.stringify((event as unknown as { data?: unknown }).data ?? {}).slice(0, 500)}`);
-    } else {
-      log(`[event] ${event.type}`);
-    }
+    log(`[event] ${event.type}`);
   });
 
   // Send prompt and wait for response
@@ -275,13 +256,6 @@ async function runQuery(
 
     const resultText = response?.data?.content || null;
     log(`Query done. Result: ${resultText ? resultText.slice(0, 200) : 'none'}`);
-    // Log full response structure for debugging
-    if (response?.data) {
-      const keys = Object.keys(response.data);
-      log(`Response keys: ${keys.join(', ')}`);
-      const data = response.data as Record<string, unknown>;
-      if (data.toolRequests) log(`Response toolRequests: ${JSON.stringify(data.toolRequests).slice(0, 500)}`);
-    }
     writeOutput({
       status: 'success',
       result: resultText,
