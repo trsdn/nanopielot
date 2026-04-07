@@ -46,6 +46,10 @@ Then run `/setup`.
 
 If you are migrating an existing NanoClaw setup or maintaining a fork, read the NanoPieLot-specific migration notes in [docs/MIGRATION.md](docs/MIGRATION.md).
 
+## Troubleshooting
+
+For common NanoPieLot-specific deployment and runtime problems, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
 ## Architecture
 
 ```
