@@ -256,16 +256,17 @@ async function runQuery(
 
     // Verbose logging for key diagnostic events
     if (event.type === 'session.tools_updated') {
-      const tools = (event as { data?: { tools?: Array<{ name: string }> } }).data?.tools;
+      const data = (event as unknown as { data?: { tools?: Array<{ name: string }> } }).data;
+      const tools = data?.tools;
       if (tools) {
         log(`[event] ${event.type} — ${tools.length} tools: ${tools.map(t => t.name).join(', ')}`);
       } else {
-        log(`[event] ${event.type} — data: ${JSON.stringify((event as Record<string, unknown>).data ?? {}).slice(0, 500)}`);
+        log(`[event] ${event.type} — data: ${JSON.stringify(data ?? {}).slice(0, 500)}`);
       }
     } else if (event.type === 'session.info' || event.type === 'session.mcp_server_status_changed') {
-      log(`[event] ${event.type} — ${JSON.stringify((event as Record<string, unknown>).data ?? {}).slice(0, 300)}`);
-    } else if (event.type === 'assistant.tool_call' || event.type === 'tool_call') {
-      log(`[event] ${event.type} — ${JSON.stringify((event as Record<string, unknown>).data ?? {}).slice(0, 500)}`);
+      log(`[event] ${event.type} — ${JSON.stringify((event as unknown as { data?: unknown }).data ?? {}).slice(0, 300)}`);
+    } else if (event.type.includes('tool')) {
+      log(`[event] ${event.type} — ${JSON.stringify((event as unknown as { data?: unknown }).data ?? {}).slice(0, 500)}`);
     } else {
       log(`[event] ${event.type}`);
     }
@@ -282,7 +283,8 @@ async function runQuery(
     if (response?.data) {
       const keys = Object.keys(response.data);
       log(`Response keys: ${keys.join(', ')}`);
-      if (response.data.role) log(`Response role: ${response.data.role}`);
+      const data = response.data as Record<string, unknown>;
+      if (data.toolRequests) log(`Response toolRequests: ${JSON.stringify(data.toolRequests).slice(0, 500)}`);
     }
     writeOutput({
       status: 'success',
