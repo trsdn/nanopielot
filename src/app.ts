@@ -73,11 +73,27 @@ let messageLoopStopRequested = false;
 const channels: Channel[] = [];
 let queue = new GroupQueue();
 
-const MODEL_COMMAND_PATTERN =
-  /^\/model(?:\s+(?<arg>(?:list|show|reset)|.+))?$/i;
+const MODEL_COMMAND_PREFIX = '/model';
 
 function normalizeModelCommandValue(raw: string): string {
   return raw.trim().replace(/\s+/g, ' ');
+}
+
+function parseModelCommand(rawCommand: string): string | null {
+  if (!rawCommand.toLowerCase().startsWith(MODEL_COMMAND_PREFIX)) {
+    return null;
+  }
+
+  const remainder = rawCommand.slice(MODEL_COMMAND_PREFIX.length);
+  if (remainder.length === 0) {
+    return '';
+  }
+
+  if (!/^\s/.test(remainder)) {
+    return null;
+  }
+
+  return remainder.trim();
 }
 
 function formatModelHelp(modelIds?: string[]): string {
@@ -622,8 +638,8 @@ export async function startNanoPieLotApp(
     chatJid: string,
     msg: NewMessage,
   ): Promise<boolean> {
-    const match = rawCommand.match(MODEL_COMMAND_PATTERN);
-    if (!match) return false;
+    const rawArg = parseModelCommand(rawCommand);
+    if (rawArg === null) return false;
 
     const group = registeredGroups[chatJid];
     const channel = findChannel(channels, chatJid);
@@ -639,7 +655,6 @@ export async function startNanoPieLotApp(
       return true;
     }
 
-    const rawArg = match.groups?.arg?.trim();
     if (!rawArg || rawArg.toLowerCase() === 'show') {
       const current = getGroupModel(group.folder);
       await channel.sendMessage(
