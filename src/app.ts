@@ -1,0 +1,918 @@
+import fs from 'fs';
+import path from 'path';
+
+import {
+  ASSISTANT_NAME,
+  DEFAULT_TRIGGER,
+  getTriggerPattern,
+  GROUPS_DIR,
+  IDLE_TIMEOUT,
+  MAX_MESSAGES_PER_PROMPT,
+  POLL_INTERVAL,
+  TIMEZONE,
+} from './config.js';
+import {
+  getChannelFactory,
+  getRegisteredChannelNames,
+} from './channels/registry.js';
+import {
+  ContainerOutput,
+  runContainerAgent,
+  writeGroupsSnapshot,
+  writeTasksSnapshot,
+} from './container-runner.js';
+import {
+  cleanupOrphans,
+  ensureContainerRuntimeRunning,
+} from './container-runtime.js';
+import { listAvailableCopilotModels } from './copilot-models.js';
+import {
+  clearGroupModel,
+  clearSession,
+  getGroupModel,
+  getAllChats,
+  getAllRegisteredGroups,
+  getAllSessions,
+  getAllTasks,
+  getLastBotMessageTimestamp,
+  getMessagesSince,
+  getNewMessages,
+  getRouterState,
+  initDatabase,
+  setRegisteredGroup,
+  setGroupModel,
+  setRouterState,
+  setSession,
+  storeChatMetadata,
+  storeMessage,
+} from './db.js';
+import { GroupQueue } from './group-queue.js';
+import { resolveGroupFolderPath } from './group-folder.js';
+import { startIpcWatcher } from './ipc.js';
+import { findChannel, formatMessages, formatOutbound } from './router.js';
+import {
+  isSenderAllowed,
+  isTriggerAllowed,
+  loadSenderAllowlist,
+  shouldDropMessage,
+} from './sender-allowlist.js';
+import { runSchedulerIteration, startSchedulerLoop } from './task-scheduler.js';
+import { Channel, NewMessage, RegisteredGroup } from './types.js';
+import { logger } from './logger.js';
+
+// Re-export for backwards compatibility during refactor
+export { escapeXml, formatMessages } from './router.js';
+
+let lastTimestamp = '';
+let sessions: Record<string, string> = {};
+let registeredGroups: Record<string, RegisteredGroup> = {};
+let lastAgentTimestamp: Record<string, string> = {};
+let messageLoopRunning = false;
+let messageLoopStopRequested = false;
+
+const channels: Channel[] = [];
+let queue = new GroupQueue();
+
+const MODEL_COMMAND_PREFIX = '/model';
+
+function normalizeModelCommandValue(raw: string): string {
+  return raw.trim().replace(/\s+/g, ' ');
+}
+
+function parseModelCommand(rawCommand: string): string | null {
+  if (!rawCommand.toLowerCase().startsWith(MODEL_COMMAND_PREFIX)) {
+    return null;
+  }
+
+  const remainder = rawCommand.slice(MODEL_COMMAND_PREFIX.length);
+  if (remainder.length === 0) {
+    return '';
+  }
+
+  if (!/^\s/.test(remainder)) {
+    return null;
+  }
+
+  return remainder.trim();
+}
+
+function formatModelHelp(modelIds?: string[]): string {
+  return [
+    'Model command:',
+    '/model',
+    '/model show',
+    '/model list',
+    '/model <model-id>',
+    '/model reset',
+    ...(modelIds && modelIds.length > 0
+      ? ['', `Available models: ${modelIds.join(', ')}`]
+      : []),
+  ].join('\n');
+}
+
+export interface MessageLoopHandle {
+  stop(): void;
+  done: Promise<void>;
+}
+
+export interface NanoPieLotAppHandle {
+  shutdown(signal?: string): Promise<void>;
+  runMessageLoopOnce(): Promise<void>;
+  runSchedulerOnce(): Promise<void>;
+  receiveMessage(chatJid: string, msg: NewMessage): Promise<void>;
+}
+
+export interface StartNanoPieLotOptions {
+  registerSignalHandlers?: boolean;
+  initializeDatabase?: boolean;
+  startBackgroundLoops?: boolean;
+}
+
+function loadState(): void {
+  lastTimestamp = getRouterState('last_timestamp') || '';
+  const agentTs = getRouterState('last_agent_timestamp');
+  try {
+    lastAgentTimestamp = agentTs ? JSON.parse(agentTs) : {};
+  } catch {
+    logger.warn('Corrupted last_agent_timestamp in DB, resetting');
+    lastAgentTimestamp = {};
+  }
+  sessions = getAllSessions();
+  registeredGroups = getAllRegisteredGroups();
+  logger.info(
+    { groupCount: Object.keys(registeredGroups).length },
+    'State loaded',
+  );
+}
+
+/**
+ * Return the message cursor for a group, recovering from the last bot reply
+ * if lastAgentTimestamp is missing (new group, corrupted state, restart).
+ */
+function getOrRecoverCursor(chatJid: string): string {
+  const existing = lastAgentTimestamp[chatJid];
+  if (existing) return existing;
+
+  const botTs = getLastBotMessageTimestamp(chatJid, ASSISTANT_NAME);
+  if (botTs) {
+    logger.info(
+      { chatJid, recoveredFrom: botTs },
+      'Recovered message cursor from last bot reply',
+    );
+    lastAgentTimestamp[chatJid] = botTs;
+    saveState();
+    return botTs;
+  }
+  return '';
+}
+
+function saveState(): void {
+  setRouterState('last_timestamp', lastTimestamp);
+  setRouterState('last_agent_timestamp', JSON.stringify(lastAgentTimestamp));
+}
+
+function registerGroup(jid: string, group: RegisteredGroup): void {
+  let groupDir: string;
+  try {
+    groupDir = resolveGroupFolderPath(group.folder);
+  } catch (err) {
+    logger.warn(
+      { jid, folder: group.folder, err },
+      'Rejecting group registration with invalid folder',
+    );
+    return;
+  }
+
+  registeredGroups[jid] = group;
+  setRegisteredGroup(jid, group);
+
+  // Create group folder
+  fs.mkdirSync(path.join(groupDir, 'logs'), { recursive: true });
+
+  // Copy AGENTS.md template into the new group folder so agents have
+  // identity and instructions from the first run.  (Fixes #1391)
+  const groupMdFile = path.join(groupDir, 'AGENTS.md');
+  if (!fs.existsSync(groupMdFile)) {
+    const templateFile = path.join(
+      GROUPS_DIR,
+      group.isMain ? 'main' : 'global',
+      'AGENTS.md',
+    );
+    if (fs.existsSync(templateFile)) {
+      let content = fs.readFileSync(templateFile, 'utf-8');
+      if (ASSISTANT_NAME !== 'Andy') {
+        content = content.replace(/^# Andy$/m, `# ${ASSISTANT_NAME}`);
+        content = content.replace(/You are Andy/g, `You are ${ASSISTANT_NAME}`);
+      }
+      fs.writeFileSync(groupMdFile, content);
+      logger.info({ folder: group.folder }, 'Created AGENTS.md from template');
+    }
+  }
+
+  logger.info(
+    { jid, name: group.name, folder: group.folder },
+    'Group registered',
+  );
+}
+
+/**
+ * Get available groups list for the agent.
+ * Returns groups ordered by most recent activity.
+ */
+export function getAvailableGroups(): import('./container-runner.js').AvailableGroup[] {
+  const chats = getAllChats();
+  const registeredJids = new Set(Object.keys(registeredGroups));
+
+  return chats
+    .filter((c) => c.jid !== '__group_sync__' && c.is_group)
+    .map((c) => ({
+      jid: c.jid,
+      name: c.name,
+      lastActivity: c.last_message_time,
+      isRegistered: registeredJids.has(c.jid),
+    }));
+}
+
+/** @internal - exported for testing */
+export function _setRegisteredGroups(
+  groups: Record<string, RegisteredGroup>,
+): void {
+  registeredGroups = groups;
+}
+
+/** @internal - for tests only. */
+export function _resetAppStateForTests(): void {
+  lastTimestamp = '';
+  sessions = {};
+  registeredGroups = {};
+  lastAgentTimestamp = {};
+  messageLoopRunning = false;
+  messageLoopStopRequested = false;
+  channels.splice(0, channels.length);
+  queue = new GroupQueue();
+}
+
+/**
+ * Process all pending messages for a group.
+ * Called by the GroupQueue when it's this group's turn.
+ */
+async function processGroupMessages(chatJid: string): Promise<boolean> {
+  const group = registeredGroups[chatJid];
+  if (!group) return true;
+
+  const channel = findChannel(channels, chatJid);
+  if (!channel) {
+    logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
+    return true;
+  }
+
+  const isMainGroup = group.isMain === true;
+
+  const missedMessages = getMessagesSince(
+    chatJid,
+    getOrRecoverCursor(chatJid),
+    ASSISTANT_NAME,
+    MAX_MESSAGES_PER_PROMPT,
+  );
+
+  if (missedMessages.length === 0) return true;
+
+  // For non-main groups, check if trigger is required and present
+  if (!isMainGroup && group.requiresTrigger !== false) {
+    const triggerPattern = getTriggerPattern(group.trigger);
+    const allowlistCfg = loadSenderAllowlist();
+    const hasTrigger = missedMessages.some(
+      (m) =>
+        triggerPattern.test(m.content.trim()) &&
+        (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+    );
+    if (!hasTrigger) return true;
+  }
+
+  const prompt = formatMessages(missedMessages, TIMEZONE);
+
+  // Advance cursor so the piping path in startMessageLoop won't re-fetch
+  // these messages. Save the old cursor so we can roll back on error.
+  const previousCursor = lastAgentTimestamp[chatJid] || '';
+  lastAgentTimestamp[chatJid] =
+    missedMessages[missedMessages.length - 1].timestamp;
+  saveState();
+
+  logger.info(
+    { group: group.name, messageCount: missedMessages.length },
+    'Processing messages',
+  );
+
+  // Track idle timer for closing stdin when agent is idle
+  let idleTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const resetIdleTimer = () => {
+    if (idleTimer) clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      logger.debug(
+        { group: group.name },
+        'Idle timeout, closing container stdin',
+      );
+      queue.closeStdin(chatJid);
+    }, IDLE_TIMEOUT);
+  };
+
+  await channel.setTyping?.(chatJid, true);
+  let hadError = false;
+  let outputSentToUser = false;
+
+  const output = await runAgent(group, prompt, chatJid, async (result) => {
+    // Streaming output callback — called for each agent result
+    if (result.result) {
+      const raw =
+        typeof result.result === 'string'
+          ? result.result
+          : JSON.stringify(result.result);
+      // Strip <internal>...</internal> blocks — agent uses these for internal reasoning
+      const text = raw.replace(/<internal>[\s\S]*?<\/internal>/g, '').trim();
+      logger.info({ group: group.name }, `Agent output: ${raw.length} chars`);
+      if (text) {
+        await channel.sendMessage(chatJid, text);
+        outputSentToUser = true;
+      }
+      // Only reset idle timer on actual results, not session-update markers (result: null)
+      resetIdleTimer();
+    }
+
+    if (result.status === 'success') {
+      queue.notifyIdle(chatJid);
+    }
+
+    if (result.status === 'error') {
+      hadError = true;
+    }
+  });
+
+  await channel.setTyping?.(chatJid, false);
+  if (idleTimer) clearTimeout(idleTimer);
+
+  if (output === 'error' || hadError) {
+    // If we already sent output to the user, don't roll back the cursor —
+    // the user got their response and re-processing would send duplicates.
+    if (outputSentToUser) {
+      logger.warn(
+        { group: group.name },
+        'Agent error after output was sent, skipping cursor rollback to prevent duplicates',
+      );
+      return true;
+    }
+    // Roll back cursor so retries can re-process these messages
+    lastAgentTimestamp[chatJid] = previousCursor;
+    saveState();
+    logger.warn(
+      { group: group.name },
+      'Agent error, rolled back message cursor for retry',
+    );
+    return false;
+  }
+
+  return true;
+}
+
+async function runAgent(
+  group: RegisteredGroup,
+  prompt: string,
+  chatJid: string,
+  onOutput?: (output: ContainerOutput) => Promise<void>,
+): Promise<'success' | 'error'> {
+  const isMain = group.isMain === true;
+  const sessionId = sessions[group.folder];
+  const model = getGroupModel(group.folder);
+
+  // Update tasks snapshot for container to read (filtered by group)
+  const tasks = getAllTasks();
+  writeTasksSnapshot(
+    group.folder,
+    isMain,
+    tasks.map((t) => ({
+      id: t.id,
+      groupFolder: t.group_folder,
+      prompt: t.prompt,
+      script: t.script || undefined,
+      schedule_type: t.schedule_type,
+      schedule_value: t.schedule_value,
+      status: t.status,
+      next_run: t.next_run,
+    })),
+  );
+
+  // Update available groups snapshot (main group only can see all groups)
+  const availableGroups = getAvailableGroups();
+  writeGroupsSnapshot(
+    group.folder,
+    isMain,
+    availableGroups,
+    new Set(Object.keys(registeredGroups)),
+  );
+
+  // Wrap onOutput to track session ID from streamed results
+  const wrappedOnOutput = onOutput
+    ? async (output: ContainerOutput) => {
+        if (output.newSessionId) {
+          sessions[group.folder] = output.newSessionId;
+          setSession(group.folder, output.newSessionId);
+        }
+        await onOutput(output);
+      }
+    : undefined;
+
+  try {
+    const output = await runContainerAgent(
+      group,
+      {
+        prompt,
+        sessionId,
+        model,
+        groupFolder: group.folder,
+        chatJid,
+        isMain,
+        assistantName: ASSISTANT_NAME,
+      },
+      (proc, containerName) =>
+        queue.registerProcess(chatJid, proc, containerName, group.folder),
+      wrappedOnOutput,
+    );
+
+    if (output.newSessionId) {
+      sessions[group.folder] = output.newSessionId;
+      setSession(group.folder, output.newSessionId);
+    }
+
+    if (output.status === 'error') {
+      logger.error(
+        { group: group.name, error: output.error },
+        'Container agent error',
+      );
+      return 'error';
+    }
+
+    return 'success';
+  } catch (err) {
+    logger.error({ group: group.name, err }, 'Agent error');
+    return 'error';
+  }
+}
+
+export async function runMessageLoopIteration(): Promise<void> {
+  const jids = Object.keys(registeredGroups);
+  const { messages, newTimestamp } = getNewMessages(
+    jids,
+    lastTimestamp,
+    ASSISTANT_NAME,
+  );
+
+  if (messages.length === 0) return;
+
+  logger.info({ count: messages.length }, 'New messages');
+
+  // Advance the "seen" cursor for all messages immediately
+  lastTimestamp = newTimestamp;
+  saveState();
+
+  // Deduplicate by group
+  const messagesByGroup = new Map<string, NewMessage[]>();
+  for (const msg of messages) {
+    const existing = messagesByGroup.get(msg.chat_jid);
+    if (existing) {
+      existing.push(msg);
+    } else {
+      messagesByGroup.set(msg.chat_jid, [msg]);
+    }
+  }
+
+  for (const [chatJid, groupMessages] of messagesByGroup) {
+    const group = registeredGroups[chatJid];
+    if (!group) continue;
+
+    const channel = findChannel(channels, chatJid);
+    if (!channel) {
+      logger.warn({ chatJid }, 'No channel owns JID, skipping messages');
+      continue;
+    }
+
+    const isMainGroup = group.isMain === true;
+    const needsTrigger = !isMainGroup && group.requiresTrigger !== false;
+
+    if (needsTrigger) {
+      const triggerPattern = getTriggerPattern(group.trigger);
+      const allowlistCfg = loadSenderAllowlist();
+      const hasTrigger = groupMessages.some(
+        (m) =>
+          triggerPattern.test(m.content.trim()) &&
+          (m.is_from_me || isTriggerAllowed(chatJid, m.sender, allowlistCfg)),
+      );
+      if (!hasTrigger) continue;
+    }
+
+    const allPending = getMessagesSince(
+      chatJid,
+      getOrRecoverCursor(chatJid),
+      ASSISTANT_NAME,
+      MAX_MESSAGES_PER_PROMPT,
+    );
+    const messagesToSend = allPending.length > 0 ? allPending : groupMessages;
+    const formatted = formatMessages(messagesToSend, TIMEZONE);
+
+    if (queue.sendMessage(chatJid, formatted)) {
+      logger.debug(
+        { chatJid, count: messagesToSend.length },
+        'Piped messages to active container',
+      );
+      lastAgentTimestamp[chatJid] =
+        messagesToSend[messagesToSend.length - 1].timestamp;
+      saveState();
+      channel
+        .setTyping?.(chatJid, true)
+        ?.catch((err) =>
+          logger.warn({ chatJid, err }, 'Failed to set typing indicator'),
+        );
+    } else {
+      queue.enqueueMessageCheck(chatJid);
+    }
+  }
+}
+
+export function startMessageLoop(): MessageLoopHandle {
+  if (messageLoopRunning) {
+    logger.debug('Message loop already running, skipping duplicate start');
+    return {
+      stop() {
+        messageLoopStopRequested = true;
+      },
+      done: Promise.resolve(),
+    };
+  }
+  messageLoopRunning = true;
+  messageLoopStopRequested = false;
+
+  logger.info(`NanoPieLot running (default trigger: ${DEFAULT_TRIGGER})`);
+
+  const done = (async () => {
+    while (!messageLoopStopRequested) {
+      try {
+        await runMessageLoopIteration();
+      } catch (err) {
+        logger.error({ err }, 'Error in message loop');
+      }
+      if (messageLoopStopRequested) break;
+      await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL));
+    }
+    messageLoopRunning = false;
+    messageLoopStopRequested = false;
+  })();
+
+  return {
+    stop() {
+      messageLoopStopRequested = true;
+    },
+    done,
+  };
+}
+
+/**
+ * Startup recovery: check for unprocessed messages in registered groups.
+ * Handles crash between advancing lastTimestamp and processing messages.
+ */
+function recoverPendingMessages(): void {
+  for (const [chatJid, group] of Object.entries(registeredGroups)) {
+    const pending = getMessagesSince(
+      chatJid,
+      getOrRecoverCursor(chatJid),
+      ASSISTANT_NAME,
+      MAX_MESSAGES_PER_PROMPT,
+    );
+    if (pending.length > 0) {
+      logger.info(
+        { group: group.name, pendingCount: pending.length },
+        'Recovery: found unprocessed messages',
+      );
+      queue.enqueueMessageCheck(chatJid);
+    }
+  }
+}
+
+function ensureContainerSystemRunning(): void {
+  ensureContainerRuntimeRunning();
+  cleanupOrphans();
+}
+
+export async function startNanoPieLotApp(
+  options: StartNanoPieLotOptions = {},
+): Promise<NanoPieLotAppHandle> {
+  const {
+    registerSignalHandlers = true,
+    initializeDatabase = true,
+    startBackgroundLoops = true,
+  } = options;
+
+  ensureContainerSystemRunning();
+  if (initializeDatabase) {
+    initDatabase();
+    logger.info('Database initialized');
+  }
+  loadState();
+  channels.splice(0, channels.length);
+  queue = new GroupQueue();
+
+  // Handle /remote-control and /remote-control-end commands
+  async function handleRemoteControl(
+    _command: string,
+    chatJid: string,
+  ): Promise<void> {
+    const channel = findChannel(channels, chatJid);
+    if (!channel) return;
+    await channel.sendMessage(
+      chatJid,
+      'Remote Control is not supported in this GitHub Copilot build of NanoPieLot.',
+    );
+    logger.info({ chatJid }, 'Rejected legacy remote control command');
+  }
+
+  async function handleModelCommand(
+    rawCommand: string,
+    chatJid: string,
+    msg: NewMessage,
+  ): Promise<boolean> {
+    const rawArg = parseModelCommand(rawCommand);
+    if (rawArg === null) return false;
+
+    const group = registeredGroups[chatJid];
+    const channel = findChannel(channels, chatJid);
+    if (!group || !channel) return true;
+
+    // Owner check: WhatsApp uses is_from_me (bot = your phone),
+    // Telegram/other channels use isMain (main group = owner's chat)
+    if (!msg.is_from_me && !group.isMain) {
+      await channel.sendMessage(
+        chatJid,
+        'Only the bot owner can change or inspect the model.',
+      );
+      return true;
+    }
+
+    if (!rawArg || rawArg.toLowerCase() === 'show') {
+      const current = getGroupModel(group.folder);
+      await channel.sendMessage(
+        chatJid,
+        current
+          ? `Current model for ${group.name}: ${current}`
+          : `Current model for ${group.name}: default`,
+      );
+      return true;
+    }
+
+    if (rawArg.toLowerCase() === 'list') {
+      const models = await listAvailableCopilotModels();
+      const lines = models.map((model) =>
+        model.name === model.id ? model.id : `${model.id} - ${model.name}`,
+      );
+      await channel.sendMessage(
+        chatJid,
+        lines.length > 0
+          ? `Available Copilot models for this account:\n${lines.join('\n')}`
+          : 'No Copilot models are currently available for this account.',
+      );
+      return true;
+    }
+
+    if (rawArg.toLowerCase() === 'reset') {
+      clearSession(group.folder);
+      delete sessions[group.folder];
+      clearGroupModel(group.folder);
+      await channel.sendMessage(
+        chatJid,
+        `Model reset for ${group.name}. The next run will use the default Copilot model.`,
+      );
+      return true;
+    }
+
+    const model = normalizeModelCommandValue(rawArg);
+    const models = await listAvailableCopilotModels();
+    const allowedModelIds = new Set(models.map((entry) => entry.id));
+    if (!allowedModelIds.has(model)) {
+      await channel.sendMessage(
+        chatJid,
+        `Unsupported model: ${model}\n\n${formatModelHelp(
+          models.map((entry) => entry.id),
+        )}`,
+      );
+      return true;
+    }
+
+    clearSession(group.folder);
+    delete sessions[group.folder];
+    setGroupModel(group.folder, model);
+    await channel.sendMessage(
+      chatJid,
+      `Model for ${group.name} set to ${model}. A fresh Copilot session will be used on the next run.`,
+    );
+    return true;
+  }
+
+  async function handleIncomingMessage(
+    chatJid: string,
+    msg: NewMessage,
+  ): Promise<void> {
+    // Remote control commands — intercept before storage
+    const trimmed = msg.content.trim();
+    if (trimmed === '/remote-control' || trimmed === '/remote-control-end') {
+      await handleRemoteControl(trimmed, chatJid);
+      return;
+    }
+
+    if (trimmed.startsWith('/model')) {
+      await handleModelCommand(trimmed, chatJid, msg);
+      return;
+    }
+
+    // Sender allowlist drop mode: discard messages from denied senders before storing
+    if (!msg.is_from_me && !msg.is_bot_message && registeredGroups[chatJid]) {
+      const cfg = loadSenderAllowlist();
+      if (
+        shouldDropMessage(chatJid, cfg) &&
+        !isSenderAllowed(chatJid, msg.sender, cfg)
+      ) {
+        if (cfg.logDenied) {
+          logger.debug(
+            { chatJid, sender: msg.sender },
+            'sender-allowlist: dropping message (drop mode)',
+          );
+        }
+        return;
+      }
+    }
+    storeMessage(msg);
+  }
+
+  // Channel callbacks (shared by all channels)
+  const channelOpts = {
+    onMessage: (chatJid: string, msg: NewMessage) => {
+      handleIncomingMessage(chatJid, msg).catch((err) =>
+        logger.error({ err, chatJid }, 'Inbound message handler error'),
+      );
+    },
+    onChatMetadata: (
+      chatJid: string,
+      timestamp: string,
+      name?: string,
+      channel?: string,
+      isGroup?: boolean,
+    ) => storeChatMetadata(chatJid, timestamp, name, channel, isGroup),
+    registeredGroups: () => registeredGroups,
+  };
+
+  // Create and connect all registered channels.
+  // Each channel self-registers via the barrel import above.
+  // Factories return null when credentials are missing, so unconfigured channels are skipped.
+  for (const channelName of getRegisteredChannelNames()) {
+    const factory = getChannelFactory(channelName)!;
+    const channel = factory(channelOpts);
+    if (!channel) {
+      logger.warn(
+        { channel: channelName },
+        'Channel installed but credentials missing — skipping. Check .env or re-run the channel skill.',
+      );
+      continue;
+    }
+    channels.push(channel);
+    await channel.connect();
+  }
+  if (channels.length === 0) {
+    throw new Error('No channels connected');
+  }
+
+  // Start subsystems (independently of connection handler)
+  const scheduler = startBackgroundLoops
+    ? startSchedulerLoop({
+        registeredGroups: () => registeredGroups,
+        getSessions: () => sessions,
+        queue,
+        onProcess: (groupJid, proc, containerName, groupFolder) =>
+          queue.registerProcess(groupJid, proc, containerName, groupFolder),
+        sendMessage: async (jid, rawText) => {
+          const channel = findChannel(channels, jid);
+          if (!channel) {
+            logger.warn({ jid }, 'No channel owns JID, cannot send message');
+            return;
+          }
+          const text = formatOutbound(rawText);
+          if (text) await channel.sendMessage(jid, text);
+        },
+      })
+    : { stop() {} };
+  const ipcWatcher = startBackgroundLoops
+    ? startIpcWatcher({
+        sendMessage: (jid, text) => {
+          const channel = findChannel(channels, jid);
+          if (!channel) throw new Error(`No channel for JID: ${jid}`);
+          return channel.sendMessage(jid, text);
+        },
+        registeredGroups: () => registeredGroups,
+        registerGroup,
+        syncGroups: async (force: boolean) => {
+          await Promise.all(
+            channels
+              .filter((ch) => ch.syncGroups)
+              .map((ch) => ch.syncGroups!(force)),
+          );
+        },
+        getAvailableGroups,
+        writeGroupsSnapshot: (gf, im, ag, rj) =>
+          writeGroupsSnapshot(gf, im, ag, rj),
+        onTasksChanged: () => {
+          const tasks = getAllTasks();
+          const taskRows = tasks.map((t) => ({
+            id: t.id,
+            groupFolder: t.group_folder,
+            prompt: t.prompt,
+            script: t.script || undefined,
+            schedule_type: t.schedule_type,
+            schedule_value: t.schedule_value,
+            status: t.status,
+            next_run: t.next_run,
+          }));
+          for (const group of Object.values(registeredGroups)) {
+            writeTasksSnapshot(group.folder, group.isMain === true, taskRows);
+          }
+        },
+      })
+    : { stop() {} };
+  queue.setProcessMessagesFn(processGroupMessages);
+  recoverPendingMessages();
+  const messageLoop = startBackgroundLoops
+    ? startMessageLoop()
+    : { stop() {}, done: Promise.resolve() };
+
+  let shuttingDown = false;
+  const shutdown = async (signal: string = 'shutdown') => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    logger.info({ signal }, 'Shutdown signal received');
+    scheduler.stop();
+    ipcWatcher.stop();
+    messageLoop.stop();
+    await messageLoop.done;
+    await queue.shutdown(10000);
+    for (const ch of channels.splice(0, channels.length)) {
+      await ch.disconnect();
+    }
+    if (registerSignalHandlers) {
+      process.off('SIGTERM', handleSigterm);
+      process.off('SIGINT', handleSigint);
+    }
+  };
+
+  const handleSigterm = () => {
+    shutdown('SIGTERM')
+      .then(() => process.exit(0))
+      .catch((err) => {
+        logger.fatal({ err }, 'Shutdown failed');
+        process.exit(1);
+      });
+  };
+  const handleSigint = () => {
+    shutdown('SIGINT')
+      .then(() => process.exit(0))
+      .catch((err) => {
+        logger.fatal({ err }, 'Shutdown failed');
+        process.exit(1);
+      });
+  };
+
+  if (registerSignalHandlers) {
+    process.on('SIGTERM', handleSigterm);
+    process.on('SIGINT', handleSigint);
+  }
+
+  messageLoop.done.catch((err) => {
+    logger.fatal({ err }, 'Message loop crashed unexpectedly');
+  });
+
+  return {
+    shutdown,
+    runMessageLoopOnce: runMessageLoopIteration,
+    runSchedulerOnce: () =>
+      runSchedulerIteration({
+        registeredGroups: () => registeredGroups,
+        getSessions: () => sessions,
+        queue,
+        onProcess: (groupJid, proc, containerName, groupFolder) =>
+          queue.registerProcess(groupJid, proc, containerName, groupFolder),
+        sendMessage: async (jid, rawText) => {
+          const channel = findChannel(channels, jid);
+          if (!channel) {
+            logger.warn({ jid }, 'No channel owns JID, cannot send message');
+            return;
+          }
+          const text = formatOutbound(rawText);
+          if (text) await channel.sendMessage(jid, text);
+        },
+      }),
+    receiveMessage: handleIncomingMessage,
+  };
+}

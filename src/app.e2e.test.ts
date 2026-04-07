@@ -19,7 +19,7 @@ import {
   _resetAppStateForTests,
   runMessageLoopIteration,
   startNanoPieLotApp,
-} from './index.js';
+} from './app.js';
 import type { Channel, RegisteredGroup } from './types.js';
 
 const sentMessages: Array<{ jid: string; text: string }> = [];
