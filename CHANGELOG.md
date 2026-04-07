@@ -2,6 +2,18 @@
 
 All notable changes to NanoPieLot will be documented in this file.
 
+## [1.2.1]
+
+### Changed
+
+- **Agent-runner runtime dependency refresh** — pinned `@modelcontextprotocol/sdk` to `1.29.0` in `container/agent-runner` and regenerated the lockfile so patched runtime transitive dependencies are used.
+- **Dev toolchain refresh** — upgraded `vitest` to `4.1.3` and regenerated the root lockfile so the Vite/Vitest dependency chain resolves to patched packages.
+
+### Fixed
+
+- **Agent-runner warning parsing ReDoS** — replaced regex-based parsing in `parseToolConfigurationWarning(...)` with direct prefix parsing to resolve the CodeQL polynomial ReDoS findings.
+- **Setup command execution safety** — replaced shell-interpolated command execution in `setup/groups.ts` and `setup/service.ts` with argument-based process execution to resolve the CodeQL shell command injection findings.
+
 ## [1.2.0]
 
 ### Added
@@ -38,6 +50,7 @@ All notable changes to NanoPieLot will be documented in this file.
 - Live model switching with `/model` command per group.
 - All NanoClaw features preserved: containers, channels, skills, scheduling, agent swarms.
 
+[1.2.1]: https://github.com/trsdn/nanopielot/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/trsdn/nanopielot/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/trsdn/nanopielot/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/trsdn/nanopielot/releases/tag/v1.0.0
