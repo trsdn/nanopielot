@@ -202,7 +202,10 @@ async function runQuery(
   let session: CopilotSession;
 
   const baseConfig = {
-    onPermissionRequest: approveAll,
+    onPermissionRequest: (...args: Parameters<typeof approveAll>) => {
+      log(`[permission] Tool permission requested: ${JSON.stringify(args[0]).slice(0, 300)}`);
+      return approveAll(...args);
+    },
     workingDirectory: '/workspace/group',
     mcpServers,
     availableTools,
@@ -250,7 +253,22 @@ async function runQuery(
   // Subscribe to events for logging
   session.on((event) => {
     if (event.type === 'assistant.message_delta') return; // too noisy
-    log(`[event] ${event.type}`);
+
+    // Verbose logging for key diagnostic events
+    if (event.type === 'session.tools_updated') {
+      const tools = (event as { data?: { tools?: Array<{ name: string }> } }).data?.tools;
+      if (tools) {
+        log(`[event] ${event.type} — ${tools.length} tools: ${tools.map(t => t.name).join(', ')}`);
+      } else {
+        log(`[event] ${event.type} — data: ${JSON.stringify((event as Record<string, unknown>).data ?? {}).slice(0, 500)}`);
+      }
+    } else if (event.type === 'session.info' || event.type === 'session.mcp_server_status_changed') {
+      log(`[event] ${event.type} — ${JSON.stringify((event as Record<string, unknown>).data ?? {}).slice(0, 300)}`);
+    } else if (event.type === 'assistant.tool_call' || event.type === 'tool_call') {
+      log(`[event] ${event.type} — ${JSON.stringify((event as Record<string, unknown>).data ?? {}).slice(0, 500)}`);
+    } else {
+      log(`[event] ${event.type}`);
+    }
   });
 
   // Send prompt and wait for response
@@ -260,7 +278,12 @@ async function runQuery(
 
     const resultText = response?.data?.content || null;
     log(`Query done. Result: ${resultText ? resultText.slice(0, 200) : 'none'}`);
-
+    // Log full response structure for debugging
+    if (response?.data) {
+      const keys = Object.keys(response.data);
+      log(`Response keys: ${keys.join(', ')}`);
+      if (response.data.role) log(`Response role: ${response.data.role}`);
+    }
     writeOutput({
       status: 'success',
       result: resultText,
