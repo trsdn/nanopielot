@@ -18,7 +18,10 @@ const sdkMocks = vi.hoisted(() => {
     })),
     clientOptions: [] as Array<Record<string, unknown>>,
     createdConfigs: [] as Array<Record<string, unknown>>,
-    resumedConfigs: [] as Array<{ sessionId: string; config: Record<string, unknown> }>,
+    resumedConfigs: [] as Array<{
+      sessionId: string;
+      config: Record<string, unknown>;
+    }>,
     metadataLookups: [] as string[],
     sessionMetadataById: new Map<string, { id: string } | undefined>(),
     stopMock: vi.fn(async () => {}),
@@ -29,7 +32,8 @@ const sdkMocks = vi.hoisted(() => {
 
   class FakeSession {
     sessionId: string;
-    private handlers: Array<(event: { type: string; data?: unknown }) => void> = [];
+    private handlers: Array<(event: { type: string; data?: unknown }) => void> =
+      [];
 
     constructor(
       readonly config: Record<string, unknown>,
@@ -158,42 +162,44 @@ describe('agent-runner tool availability', () => {
     consoleLogSpy.mockClear();
     consoleErrorSpy.mockClear();
     setTimeoutSpy.mockClear();
-    sdkMocks.setSessionBehavior(async ({ config, session, prompt, timeout }) => {
-      expect(prompt).toBe(testContainerInput.prompt);
-      expect(timeout).toBe(10 * 60 * 1000);
+    sdkMocks.setSessionBehavior(
+      async ({ config, session, prompt, timeout }) => {
+        expect(prompt).toBe(testContainerInput.prompt);
+        expect(timeout).toBe(10 * 60 * 1000);
 
-      if (Object.prototype.hasOwnProperty.call(config, 'availableTools')) {
-        session.emit({
-          type: 'session.info',
-          data: {
-            infoType: 'configuration',
-            message: 'Disabled tools: bash, edit, glob',
-          },
+        if (Object.prototype.hasOwnProperty.call(config, 'availableTools')) {
+          session.emit({
+            type: 'session.info',
+            data: {
+              infoType: 'configuration',
+              message: 'Disabled tools: bash, edit, glob',
+            },
+          });
+        } else {
+          session.emit({
+            type: 'session.tools_updated',
+            data: {
+              tools: [{ name: 'bash' }, { name: 'web_search' }],
+            },
+          });
+        }
+
+        const permissionHandler = config.onPermissionRequest as
+          | ((request: unknown) => Promise<unknown>)
+          | undefined;
+        await permissionHandler?.({
+          kind: 'shell',
+          toolCallId: 'tool-1',
+          fullCommandText: 'echo hello',
         });
-      } else {
+
         session.emit({
-          type: 'session.tools_updated',
-          data: {
-            tools: [{ name: 'bash' }, { name: 'web_search' }],
-          },
+          type: 'tool.execution_start',
+          data: { toolName: 'bash' },
         });
-      }
-
-      const permissionHandler = config.onPermissionRequest as
-        | ((request: unknown) => Promise<unknown>)
-        | undefined;
-      await permissionHandler?.({
-        kind: 'shell',
-        toolCallId: 'tool-1',
-        fullCommandText: 'echo hello',
-      });
-
-      session.emit({
-        type: 'tool.execution_start',
-        data: { toolName: 'bash' },
-      });
-      session.emit({ type: 'session.idle' });
-    });
+        session.emit({ type: 'session.idle' });
+      },
+    );
   });
 
   afterEach(() => {
@@ -249,7 +255,9 @@ describe('agent-runner tool availability', () => {
     });
 
     const errorOutput = consoleErrorSpy.mock.calls.flat().join('\n');
-    expect(errorOutput).toContain('[agent-runner] [event] session.tools_updated');
+    expect(errorOutput).toContain(
+      '[agent-runner] [event] session.tools_updated',
+    );
     expect(errorOutput).not.toContain('Disabled tools');
   });
 
