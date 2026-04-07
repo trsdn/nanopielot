@@ -47,6 +47,8 @@ Four types of skills exist in NanoPieLot. See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 Before creating a PR, adding a skill, or preparing any contribution, you MUST read [CONTRIBUTING.md](CONTRIBUTING.md). It covers accepted change types, the four skill types and their guidelines, SKILL.md format rules, PR requirements, and the pre-submission checklist (searching for existing PRs/issues, testing, description format).
 
+When implementing an issue or feature, always work on a dedicated branch and merge through a pull request. Do not develop issue work directly on `main`.
+
 ## Development
 
 Run commands directly—don't tell the user to run them.

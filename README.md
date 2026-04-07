@@ -50,6 +50,10 @@ Channels → SQLite → Polling loop → Container (GitHub Copilot SDK) → Resp
 
 Single Node.js process. Channels self-register at startup. Agents run in isolated Linux containers. Per-group message queue with concurrency control.
 
+## Contributing Workflow
+
+For issue-driven work, create a dedicated branch and merge via pull request. Avoid developing feature or issue work directly on `main`.
+
 ## Special Thanks
 
 NanoPieLot wouldn't exist without [NanoClaw](https://github.com/qwibitai/nanoclaw). The original project's philosophy, architecture, and skill system are the foundation of everything here. We just swapped the engine. 🥧
