@@ -18,7 +18,12 @@ const sdkMocks = vi.hoisted(() => {
     })),
     clientOptions: [] as Array<Record<string, unknown>>,
     createdConfigs: [] as Array<Record<string, unknown>>,
-    resumedConfigs: [] as Array<{ sessionId: string; config: Record<string, unknown> }>,
+    resumedConfigs: [] as Array<{
+      sessionId: string;
+      config: Record<string, unknown>;
+    }>,
+    metadataLookups: [] as string[],
+    sessionMetadataById: new Map<string, { id: string } | undefined>(),
     stopMock: vi.fn(async () => {}),
     sessionBehavior: undefined as
       | ((args: SessionBehaviorArgs) => Promise<void> | void)
@@ -27,7 +32,8 @@ const sdkMocks = vi.hoisted(() => {
 
   class FakeSession {
     sessionId: string;
-    private handlers: Array<(event: { type: string; data?: unknown }) => void> = [];
+    private handlers: Array<(event: { type: string; data?: unknown }) => void> =
+      [];
 
     constructor(
       readonly config: Record<string, unknown>,
@@ -82,6 +88,13 @@ const sdkMocks = vi.hoisted(() => {
       return new FakeSession(config, sessionId);
     }
 
+    async getSessionMetadata(
+      sessionId: string,
+    ): Promise<{ id: string } | undefined> {
+      state.metadataLookups.push(sessionId);
+      return state.sessionMetadataById.get(sessionId);
+    }
+
     async stop(): Promise<void> {
       await state.stopMock();
     }
@@ -94,8 +107,16 @@ const sdkMocks = vi.hoisted(() => {
       state.clientOptions.length = 0;
       state.createdConfigs.length = 0;
       state.resumedConfigs.length = 0;
+      state.metadataLookups.length = 0;
+      state.sessionMetadataById.clear();
       state.stopMock.mockClear();
       state.sessionBehavior = undefined;
+    },
+    setSessionMetadata(
+      sessionId: string,
+      metadata: { id: string } | undefined,
+    ): void {
+      state.sessionMetadataById.set(sessionId, metadata);
     },
     setSessionBehavior(
       behavior: (args: SessionBehaviorArgs) => Promise<void> | void,
@@ -141,42 +162,44 @@ describe('agent-runner tool availability', () => {
     consoleLogSpy.mockClear();
     consoleErrorSpy.mockClear();
     setTimeoutSpy.mockClear();
-    sdkMocks.setSessionBehavior(async ({ config, session, prompt, timeout }) => {
-      expect(prompt).toBe(testContainerInput.prompt);
-      expect(timeout).toBe(10 * 60 * 1000);
+    sdkMocks.setSessionBehavior(
+      async ({ config, session, prompt, timeout }) => {
+        expect(prompt).toBe(testContainerInput.prompt);
+        expect(timeout).toBe(10 * 60 * 1000);
 
-      if (Object.prototype.hasOwnProperty.call(config, 'availableTools')) {
-        session.emit({
-          type: 'session.info',
-          data: {
-            infoType: 'configuration',
-            message: 'Disabled tools: bash, edit, glob',
-          },
+        if (Object.prototype.hasOwnProperty.call(config, 'availableTools')) {
+          session.emit({
+            type: 'session.info',
+            data: {
+              infoType: 'configuration',
+              message: 'Disabled tools: bash, edit, glob',
+            },
+          });
+        } else {
+          session.emit({
+            type: 'session.tools_updated',
+            data: {
+              tools: [{ name: 'bash' }, { name: 'web_search' }],
+            },
+          });
+        }
+
+        const permissionHandler = config.onPermissionRequest as
+          | ((request: unknown) => Promise<unknown>)
+          | undefined;
+        await permissionHandler?.({
+          kind: 'shell',
+          toolCallId: 'tool-1',
+          fullCommandText: 'echo hello',
         });
-      } else {
+
         session.emit({
-          type: 'session.tools_updated',
-          data: {
-            tools: [{ name: 'bash' }, { name: 'web_search' }],
-          },
+          type: 'tool.execution_start',
+          data: { toolName: 'bash' },
         });
-      }
-
-      const permissionHandler = config.onPermissionRequest as
-        | ((request: unknown) => Promise<unknown>)
-        | undefined;
-      await permissionHandler?.({
-        kind: 'shell',
-        toolCallId: 'tool-1',
-        fullCommandText: 'echo hello',
-      });
-
-      session.emit({
-        type: 'tool.execution_start',
-        data: { toolName: 'bash' },
-      });
-      session.emit({ type: 'session.idle' });
-    });
+        session.emit({ type: 'session.idle' });
+      },
+    );
   });
 
   afterEach(() => {
@@ -232,7 +255,9 @@ describe('agent-runner tool availability', () => {
     });
 
     const errorOutput = consoleErrorSpy.mock.calls.flat().join('\n');
-    expect(errorOutput).toContain('[agent-runner] [event] session.tools_updated');
+    expect(errorOutput).toContain(
+      '[agent-runner] [event] session.tools_updated',
+    );
     expect(errorOutput).not.toContain('Disabled tools');
   });
 
@@ -260,6 +285,9 @@ describe('agent-runner tool availability', () => {
   it('resumes persisted sessions with the same safe config', async () => {
     const { createCopilotClient, runQuery } = await loadAgentRunnerModule();
     const client = createCopilotClient();
+    sdkMocks.setSessionMetadata('persisted-session-id', {
+      id: 'persisted-session-id',
+    });
 
     await runQuery(
       client,
@@ -270,6 +298,7 @@ describe('agent-runner tool availability', () => {
     );
 
     expect(sdkMocks.state.createdConfigs).toHaveLength(0);
+    expect(sdkMocks.state.metadataLookups).toEqual(['persisted-session-id']);
     expect(sdkMocks.state.resumedConfigs).toEqual([
       {
         sessionId: 'persisted-session-id',
@@ -279,5 +308,30 @@ describe('agent-runner tool availability', () => {
         }),
       },
     ]);
+  });
+
+  it('creates a new session when persisted metadata is missing', async () => {
+    const { createCopilotClient, runQuery } = await loadAgentRunnerModule();
+    const client = createCopilotClient();
+    sdkMocks.setSessionMetadata('stale-session-id', undefined);
+
+    const result = await runQuery(
+      client,
+      testContainerInput.prompt,
+      'stale-session-id',
+      '/tmp/ipc-mcp-stdio.js',
+      testContainerInput,
+    );
+
+    expect(result).toEqual({
+      newSessionId: 'new-session-id',
+      closedDuringQuery: false,
+    });
+    expect(sdkMocks.state.metadataLookups).toEqual(['stale-session-id']);
+    expect(sdkMocks.state.resumedConfigs).toHaveLength(0);
+    expect(sdkMocks.state.createdConfigs).toHaveLength(1);
+    expect(consoleErrorSpy.mock.calls.flat().join('\n')).toContain(
+      '[agent-runner] Session not found, creating new session: stale-session-id',
+    );
   });
 });
