@@ -42,6 +42,10 @@ Then run `/setup`.
 - GitHub Copilot CLI
 - Apple Container (macOS) or Docker (macOS/Linux)
 
+## Migration from NanoClaw
+
+If you are migrating an existing NanoClaw setup or maintaining a fork, read the NanoPieLot-specific migration notes in [docs/MIGRATION.md](docs/MIGRATION.md).
+
 ## Architecture
 
 ```
