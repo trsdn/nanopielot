@@ -185,3 +185,40 @@ Without the correct `cwd`, the Copilot CLI server may not discover project instr
 3. `npm run build`
 4. restart the host service
 5. if needed, clear stale persisted sessions before retesting
+
+## Upgrading `@github/copilot-sdk` safely
+
+### Why this matters
+
+`@github/copilot-sdk` is still on a `0.x` version line, so even small-looking upgrades should be treated as compatibility changes.
+
+NanoPieLot pins the SDK to an exact version in both:
+
+- `package.json`
+- `container/agent-runner/package.json`
+
+The agent-runner also logs a startup warning if the loaded SDK version does not match the pinned one.
+
+### Recommended upgrade process
+
+1. Change both package manifests to the exact target version.
+2. Update both lockfiles.
+3. Diff the published SDK type definitions before upgrading:
+
+```bash
+npm pack @github/copilot-sdk@CURRENT_VERSION
+npm pack @github/copilot-sdk@TARGET_VERSION
+tar -xOf github-copilot-sdk-CURRENT_VERSION.tgz package/dist/index.d.ts > /tmp/sdk-current.d.ts
+tar -xOf github-copilot-sdk-TARGET_VERSION.tgz package/dist/index.d.ts > /tmp/sdk-target.d.ts
+diff -u /tmp/sdk-current.d.ts /tmp/sdk-target.d.ts
+```
+
+4. Re-run the host build/tests and the container agent-runner build.
+5. After deployment, check agent-runner logs for SDK compatibility warnings.
+
+### What to do if you see a version mismatch warning
+
+- verify that both package manifests and lockfiles were updated together
+- rebuild the host app and the agent-runner
+- rebuild the container image if needed
+- do not ignore the warning just because the patch version is small

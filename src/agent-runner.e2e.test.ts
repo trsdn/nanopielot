@@ -281,6 +281,24 @@ describe('agent-runner tool availability', () => {
     ).toBeNull();
   });
 
+  it('builds SDK compatibility warnings for unpinned or mismatched versions', async () => {
+    const { buildCopilotSdkCompatibilityWarning } =
+      await loadAgentRunnerModule();
+
+    expect(
+      buildCopilotSdkCompatibilityWarning('0.2.1', '0.2.1'),
+    ).toBeUndefined();
+    expect(buildCopilotSdkCompatibilityWarning('^0.2.1', '0.2.1')).toContain(
+      'not pinned to an exact version',
+    );
+    expect(buildCopilotSdkCompatibilityWarning('0.2.1', '0.2.2')).toContain(
+      'does not match pinned version 0.2.1',
+    );
+    expect(buildCopilotSdkCompatibilityWarning(undefined, '0.2.1')).toContain(
+      'Could not verify pinned',
+    );
+  });
+
   it('logs clear warnings for disabled tools and unknown allowlist names', async () => {
     const { createCopilotClient, runQuery } = await loadAgentRunnerModule();
     const client = createCopilotClient();
@@ -321,8 +339,12 @@ describe('agent-runner tool availability', () => {
     expect(errorOutput).toContain(
       '[agent-runner] WARNING: Tool configuration issue detected. Check availableTools and MCP tool registration.',
     );
-    expect(errorOutput).toContain('[agent-runner] Disabled tools: bash, edit, glob');
-    expect(errorOutput).toContain('[agent-runner] Unknown tool names: Bash, Read');
+    expect(errorOutput).toContain(
+      '[agent-runner] Disabled tools: bash, edit, glob',
+    );
+    expect(errorOutput).toContain(
+      '[agent-runner] Unknown tool names: Bash, Read',
+    );
     expect(
       consoleErrorSpy.mock.calls.filter((call) =>
         call.join('\n').includes('Disabled tools: bash, edit, glob'),
