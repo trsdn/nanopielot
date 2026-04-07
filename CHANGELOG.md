@@ -17,3 +17,6 @@ All notable changes to NanoPieLot will be documented in this file.
 - Authentication via `copilot login` device flow (no API keys).
 - Live model switching with `/model` command per group.
 - All NanoClaw features preserved: containers, channels, skills, scheduling, agent swarms.
+
+[1.1.0]: https://github.com/trsdn/nanopielot/compare/v1.0.0...v1.1.0
+[1.0.0]: https://github.com/trsdn/nanopielot/releases/tag/v1.0.0
