@@ -88,19 +88,44 @@ function parseToolList(value: string): string[] {
     .filter(Boolean);
 }
 
+function startsWithIgnoreCase(value: string, prefix: string): boolean {
+  return value.length >= prefix.length
+    && value.slice(0, prefix.length).toLowerCase() === prefix.toLowerCase();
+}
+
+function parseWarningValue(
+  message: string,
+  prefix: string,
+): string | undefined {
+  if (!startsWithIgnoreCase(message, prefix)) {
+    return undefined;
+  }
+
+  const value = message.slice(prefix.length).trim();
+  return value.length > 0 ? value : undefined;
+}
+
 export function parseToolConfigurationWarning(
   message: string,
 ): ToolConfigurationWarning | null {
-  const disabledMatch = message.match(/^Disabled tools:\s*(.+)$/i);
-  if (disabledMatch) {
-    return { disabledTools: parseToolList(disabledMatch[1]) };
+  const disabledTools = parseWarningValue(message, 'Disabled tools:');
+  if (disabledTools) {
+    return { disabledTools: parseToolList(disabledTools) };
   }
 
-  const unknownMatch = message.match(
-    /^Unknown tool name(?: in the tool allowlist)?:\s*(.+)$/i,
-  );
-  if (unknownMatch) {
-    return { unknownTools: parseToolList(unknownMatch[1]) };
+  const unknownPrefixes = [
+    'Unknown tool name in the tool allowlist:',
+    'Unknown tool name:',
+  ];
+  let unknownTools: string | undefined;
+  for (const prefix of unknownPrefixes) {
+    unknownTools = parseWarningValue(message, prefix);
+    if (unknownTools) {
+      break;
+    }
+  }
+  if (unknownTools) {
+    return { unknownTools: parseToolList(unknownTools) };
   }
 
   if (message.includes('Unknown tool name')) {
