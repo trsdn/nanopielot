@@ -168,18 +168,14 @@ function buildMcpServers(mcpServerPath: string, containerInput: ContainerInput):
 
 /**
  * Build the list of allowed tools.
+ * Tool names must match the SDK's internal lowercase names, not PascalCase.
+ * Returning undefined allows all discovered tools (built-in + MCP).
  */
-function buildAvailableTools(): string[] {
-  return [
-    'Bash',
-    'Read', 'Write', 'Edit', 'Glob', 'Grep',
-    'WebSearch', 'WebFetch',
-    'Task', 'TaskOutput', 'TaskStop',
-    'Agent',
-    'TodoWrite', 'ToolSearch', 'Skill',
-    'NotebookEdit',
-    'mcp__nanopielot__*',
-  ];
+function buildAvailableTools(): undefined {
+  // Let the SDK expose all available tools — both built-in and MCP.
+  // The SDK uses lowercase names (bash, edit, glob, grep, web_search, etc.)
+  // and hyphenated MCP tool names (nanopielot-send_message, etc.).
+  return undefined;
 }
 
 /**
@@ -208,7 +204,7 @@ async function runQuery(
     },
     workingDirectory: '/workspace/group',
     mcpServers,
-    availableTools,
+    ...(availableTools ? { availableTools } : {}),
     systemMessage,
     ...(containerInput.model ? { model: containerInput.model } : {}),
   };
