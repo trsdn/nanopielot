@@ -236,6 +236,75 @@ describe('agent-runner tool availability', () => {
     expect(errorOutput).not.toContain('Disabled tools');
   });
 
+  it('parses disabled and unknown tool configuration warnings', async () => {
+    const { parseToolConfigurationWarning } = await loadAgentRunnerModule();
+
+    expect(
+      parseToolConfigurationWarning('Disabled tools: bash, edit, glob'),
+    ).toEqual({
+      disabledTools: ['bash', 'edit', 'glob'],
+    });
+    expect(
+      parseToolConfigurationWarning(
+        'Unknown tool name in the tool allowlist: Bash, Read',
+      ),
+    ).toEqual({
+      unknownTools: ['Bash', 'Read'],
+    });
+    expect(
+      parseToolConfigurationWarning('Configuration loaded successfully'),
+    ).toBeNull();
+  });
+
+  it('logs clear warnings for disabled tools and unknown allowlist names', async () => {
+    const { createCopilotClient, runQuery } = await loadAgentRunnerModule();
+    const client = createCopilotClient();
+    sdkMocks.setSessionBehavior(async ({ session }) => {
+      session.emit({
+        type: 'session.info',
+        data: {
+          infoType: 'configuration',
+          message: 'Disabled tools: bash, edit, glob',
+        },
+      });
+      session.emit({
+        type: 'session.info',
+        data: {
+          infoType: 'configuration',
+          message: 'Unknown tool name in the tool allowlist: Bash, Read',
+        },
+      });
+      session.emit({
+        type: 'session.info',
+        data: {
+          infoType: 'configuration',
+          message: 'Disabled tools: bash, edit, glob',
+        },
+      });
+      session.emit({ type: 'session.idle' });
+    });
+
+    await runQuery(
+      client,
+      testContainerInput.prompt,
+      undefined,
+      '/tmp/ipc-mcp-stdio.js',
+      testContainerInput,
+    );
+
+    const errorOutput = consoleErrorSpy.mock.calls.flat().join('\n');
+    expect(errorOutput).toContain(
+      '[agent-runner] WARNING: Tool configuration issue detected. Check availableTools and MCP tool registration.',
+    );
+    expect(errorOutput).toContain('[agent-runner] Disabled tools: bash, edit, glob');
+    expect(errorOutput).toContain('[agent-runner] Unknown tool names: Bash, Read');
+    expect(
+      consoleErrorSpy.mock.calls.filter((call) =>
+        call.join('\n').includes('Disabled tools: bash, edit, glob'),
+      ),
+    ).toHaveLength(1);
+  });
+
   it('wires approveAll into tool-backed queries', async () => {
     const { createCopilotClient, runQuery } = await loadAgentRunnerModule();
     const client = createCopilotClient();

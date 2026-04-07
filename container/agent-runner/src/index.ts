@@ -70,6 +70,57 @@ function log(message: string): void {
   console.error(`[agent-runner] ${message}`);
 }
 
+interface ToolConfigurationWarning {
+  disabledTools?: string[];
+  unknownTools?: string[];
+}
+
+function parseToolList(value: string): string[] {
+  return value
+    .split(',')
+    .map(item => item.trim())
+    .filter(Boolean);
+}
+
+export function parseToolConfigurationWarning(
+  message: string,
+): ToolConfigurationWarning | null {
+  const disabledMatch = message.match(/^Disabled tools:\s*(.+)$/i);
+  if (disabledMatch) {
+    return { disabledTools: parseToolList(disabledMatch[1]) };
+  }
+
+  const unknownMatch = message.match(
+    /^Unknown tool name(?: in the tool allowlist)?:\s*(.+)$/i,
+  );
+  if (unknownMatch) {
+    return { unknownTools: parseToolList(unknownMatch[1]) };
+  }
+
+  if (message.includes('Unknown tool name')) {
+    return { unknownTools: [] };
+  }
+
+  return null;
+}
+
+function logToolConfigurationWarning(message: string): void {
+  const warning = parseToolConfigurationWarning(message);
+  if (!warning) return;
+
+  log('WARNING: Tool configuration issue detected. Check availableTools and MCP tool registration.');
+  if (warning.disabledTools && warning.disabledTools.length > 0) {
+    log(`Disabled tools: ${warning.disabledTools.join(', ')}`);
+  }
+  if (warning.unknownTools) {
+    if (warning.unknownTools.length > 0) {
+      log(`Unknown tool names: ${warning.unknownTools.join(', ')}`);
+    } else {
+      log(`Unknown tool names reported by SDK: ${message}`);
+    }
+  }
+}
+
 /**
  * Check for _close sentinel.
  */
@@ -244,8 +295,24 @@ export async function runQuery(
   setTimeout(pollIpcDuringQuery, IPC_POLL_MS);
 
   // Subscribe to events for logging
+  const seenToolConfigWarnings = new Set<string>();
   session.on((event) => {
     if (event.type === 'assistant.message_delta') return; // too noisy
+    if (event.type === 'session.info') {
+      const data =
+        event.data && typeof event.data === 'object'
+          ? (event.data as Record<string, unknown>)
+          : null;
+      const infoType = data?.infoType;
+      const message = data?.message;
+      if (infoType === 'configuration' && typeof message === 'string') {
+        const warning = parseToolConfigurationWarning(message);
+        if (warning && !seenToolConfigWarnings.has(message)) {
+          seenToolConfigWarnings.add(message);
+          logToolConfigurationWarning(message);
+        }
+      }
+    }
     log(`[event] ${event.type}`);
   });
 
