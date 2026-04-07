@@ -207,8 +207,17 @@ export async function runQuery(
   };
 
   if (sessionId) {
-    log(`Resuming session: ${sessionId}`);
-    session = await client.resumeSession(sessionId, baseConfig as ResumeSessionConfig);
+    const sessionMetadata = await client.getSessionMetadata(sessionId);
+    if (sessionMetadata) {
+      log(`Resuming session: ${sessionId}`);
+      session = await client.resumeSession(
+        sessionId,
+        baseConfig as ResumeSessionConfig,
+      );
+    } else {
+      log(`Session not found, creating new session: ${sessionId}`);
+      session = await client.createSession(baseConfig as SessionConfig);
+    }
   } else {
     log('Creating new session');
     session = await client.createSession(baseConfig as SessionConfig);
