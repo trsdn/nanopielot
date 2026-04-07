@@ -171,7 +171,7 @@ function buildMcpServers(mcpServerPath: string, containerInput: ContainerInput):
  * Tool names must match the SDK's internal lowercase names, not PascalCase.
  * Returning undefined allows all discovered tools (built-in + MCP).
  */
-function buildAvailableTools(): undefined {
+export function buildAvailableTools(): undefined {
   // Let the SDK expose all available tools — both built-in and MCP.
   // The SDK uses lowercase names (bash, edit, glob, grep, web_search, etc.)
   // and hyphenated MCP tool names (nanopielot-send_message, etc.).
@@ -183,7 +183,7 @@ function buildAvailableTools(): undefined {
  * Creates or resumes a session, sends the prompt, and collects the response.
  * Also polls IPC for follow-up messages during the query.
  */
-async function runQuery(
+export async function runQuery(
   client: CopilotClient,
   prompt: string,
   sessionId: string | undefined,
@@ -330,7 +330,14 @@ async function runScript(script: string): Promise<ScriptResult | null> {
   });
 }
 
-async function main(): Promise<void> {
+export function createCopilotClient(): CopilotClient {
+  return new CopilotClient({
+    logLevel: 'warning',
+    cwd: '/workspace/group',
+  });
+}
+
+export async function runAgentRunner(): Promise<void> {
   let containerInput: ContainerInput;
 
   try {
@@ -390,10 +397,7 @@ async function main(): Promise<void> {
   // via `copilot login`, and the SDK reuses that stored signed-in user state.
   // cwd must point to the group workspace so the CLI discovers AGENTS.md
   // and project-level settings from the working directory.
-  const client = new CopilotClient({
-    logLevel: 'warning',
-    cwd: '/workspace/group',
-  });
+  const client = createCopilotClient();
 
   try {
     // Query loop: run query → wait for IPC message → run new query → repeat
@@ -445,4 +449,11 @@ async function main(): Promise<void> {
   }
 }
 
-main();
+const entrypointPath = process.argv[1]
+  ? path.resolve(process.cwd(), process.argv[1])
+  : undefined;
+const modulePath = fileURLToPath(import.meta.url);
+
+if (entrypointPath === modulePath) {
+  void runAgentRunner();
+}
