@@ -4,7 +4,7 @@
  *
  * Fixes: Root→system systemd, WSL nohup fallback, no `|| true` swallowing errors.
  */
-import { execSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -165,7 +165,7 @@ function setupLinux(
  */
 function killOrphanedProcesses(projectRoot: string): void {
   try {
-    execSync(`pkill -f '${projectRoot}/dist/index\\.js' || true`, {
+    execFileSync('pkill', ['-f', `${projectRoot}/dist/index\\.js`], {
       stdio: 'ignore',
     });
     logger.info('Stopped any orphaned nanopielot processes');
