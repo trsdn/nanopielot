@@ -512,9 +512,11 @@ async function runScript(script: string): Promise<ScriptResult | null> {
 }
 
 export function createCopilotClient(): CopilotClient {
+  const token = process.env.COPILOT_GITHUB_TOKEN;
   return new CopilotClient({
     logLevel: 'warning',
     cwd: '/workspace/group',
+    ...(token ? { githubToken: token } : {}),
   });
 }
 

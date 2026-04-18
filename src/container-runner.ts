@@ -11,12 +11,18 @@ import {
   CONTAINER_MAX_OUTPUT_SIZE,
   CONTAINER_TIMEOUT,
   COPILOT_AUTH_DIR,
+  COPILOT_GITHUB_TOKEN,
   DATA_DIR,
   GROUPS_DIR,
   IDLE_TIMEOUT,
   TIMEZONE,
 } from './config.js';
+import { hasCopilotToken } from './copilot-auth.js';
 import { resolveGroupFolderPath, resolveGroupIpcPath } from './group-folder.js';
+
+// Token env-file: written once at startup, read by Docker via --env-file.
+// Lives under data/ (gitignored) so the token never enters host process env.
+const COPILOT_TOKEN_ENV_FILE = path.join(DATA_DIR, 'copilot-token.env');
 import { logger } from './logger.js';
 import {
   CONTAINER_RUNTIME_BIN,
@@ -127,14 +133,16 @@ function buildVolumeMounts(
     }
   }
 
-  // Shared Copilot auth state. Setup seeds this directory with a device-login
-  // session, and each agent container reuses it through HOME=/home/node.
-  fs.mkdirSync(COPILOT_AUTH_DIR, { recursive: true });
-  mounts.push({
-    hostPath: COPILOT_AUTH_DIR,
-    containerPath: '/home/node/.copilot',
-    readonly: false,
-  });
+  // Shared Copilot auth state. When a token is configured, containers
+  // authenticate via COPILOT_GITHUB_TOKEN env var instead of mounted state.
+  if (!hasCopilotToken()) {
+    fs.mkdirSync(COPILOT_AUTH_DIR, { recursive: true });
+    mounts.push({
+      hostPath: COPILOT_AUTH_DIR,
+      containerPath: '/home/node/.copilot',
+      readonly: false,
+    });
+  }
 
   // Per-group IPC namespace: each group gets its own IPC directory
   // This prevents cross-group privilege escalation via IPC
@@ -203,6 +211,18 @@ function buildContainerArgs(
   // Pass host timezone so container's local time matches the user's
   args.push('-e', `TZ=${TIMEZONE}`);
   args.push('-e', 'HOME=/home/node');
+
+  // Token-based auth: pass via --env-file so the token goes directly from
+  // file to container, never appearing in host process environment or CLI args.
+  if (hasCopilotToken()) {
+    fs.mkdirSync(path.dirname(COPILOT_TOKEN_ENV_FILE), { recursive: true });
+    fs.writeFileSync(
+      COPILOT_TOKEN_ENV_FILE,
+      `COPILOT_GITHUB_TOKEN=${COPILOT_GITHUB_TOKEN}\n`,
+      { mode: 0o600 },
+    );
+    args.push('--env-file', COPILOT_TOKEN_ENV_FILE);
+  }
 
   // Runtime-specific args for host gateway resolution
   args.push(...hostGatewayArgs());

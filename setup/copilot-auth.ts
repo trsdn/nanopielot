@@ -1,6 +1,6 @@
 import { spawnSync } from 'child_process';
 
-import { ensureCopilotAuthDir, hasCopilotAuth } from '../src/copilot-auth.js';
+import { ensureCopilotAuthDir, hasCopilotToken, hasDeviceAuth } from '../src/copilot-auth.js';
 import { CONTAINER_IMAGE } from '../src/config.js';
 import { logger } from '../src/logger.js';
 import { commandExists } from './platform.js';
@@ -49,6 +49,17 @@ function emit(
 export async function run(args: string[]): Promise<void> {
   const { runtime, login } = parseArgs(args);
 
+  // Token-based auth: if COPILOT_GITHUB_TOKEN is set, skip device login entirely
+  if (hasCopilotToken()) {
+    const authDir = ensureCopilotAuthDir();
+    logger.info('COPILOT_GITHUB_TOKEN is set, skipping device login');
+    emit(runtime || 'any', authDir, true, 'success', {
+      ACTION: 'token',
+      AUTH_METHOD: 'token',
+    });
+    return;
+  }
+
   if (!runtime || !['docker', 'apple-container'].includes(runtime)) {
     emit('unknown', ensureCopilotAuthDir(), false, 'failed', {
       ERROR: 'missing_or_invalid_runtime',
@@ -66,9 +77,10 @@ export async function run(args: string[]): Promise<void> {
 
   const authDir = ensureCopilotAuthDir();
   if (!login) {
-    const loggedIn = hasCopilotAuth(authDir);
+    const loggedIn = hasDeviceAuth(authDir);
     emit(runtime, authDir, loggedIn, loggedIn ? 'success' : 'failed', {
       ACTION: 'check',
+      AUTH_METHOD: 'device',
     });
     if (!loggedIn) process.exit(1);
     return;
@@ -93,9 +105,10 @@ export async function run(args: string[]): Promise<void> {
     { stdio: 'inherit' },
   );
 
-  const loggedIn = hasCopilotAuth(authDir);
+  const loggedIn = hasDeviceAuth(authDir);
   emit(runtime, authDir, loggedIn, loggedIn ? 'success' : 'failed', {
     ACTION: 'login',
+    AUTH_METHOD: 'device',
     EXIT_CODE: result.status ?? 1,
   });
 
