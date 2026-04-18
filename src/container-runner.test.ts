@@ -12,6 +12,7 @@ vi.mock('./config.js', () => ({
   CONTAINER_MAX_OUTPUT_SIZE: 10485760,
   CONTAINER_TIMEOUT: 1800000, // 30min
   COPILOT_AUTH_DIR: '/tmp/nanopielot-test-copilot-auth',
+  COPILOT_GITHUB_TOKEN: '',
   DATA_DIR: '/tmp/nanopielot-test-data',
   GROUPS_DIR: '/tmp/nanopielot-test-groups',
   IDLE_TIMEOUT: 1800000, // 30min

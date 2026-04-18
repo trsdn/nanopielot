@@ -1,5 +1,7 @@
 import { CopilotClient } from '@github/copilot-sdk';
 
+import { COPILOT_GITHUB_TOKEN } from './config.js';
+
 export interface AvailableCopilotModel {
   id: string;
   name: string;
@@ -10,6 +12,7 @@ export async function listAvailableCopilotModels(): Promise<
 > {
   const client = new CopilotClient({
     logLevel: 'warning',
+    ...(COPILOT_GITHUB_TOKEN ? { githubToken: COPILOT_GITHUB_TOKEN } : {}),
   });
 
   try {
