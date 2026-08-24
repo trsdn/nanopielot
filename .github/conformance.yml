@@ -1,0 +1,97 @@
+# Conformance record for trsdn/nanopielot.
+#
+# Format: https://github.com/trsdn/.github/blob/v1.2.0/docs/conformance-record.md
+# Per-criterion notes and rationale: docs/conformance.md
+#
+# The badge in .github/badges/ is generated from this file. Change the evidence
+# first, then this record, then regenerate. Never the other way round.
+
+standard_version: "1.2.0"
+assessed_on: "2026-08-24"
+state: "Needs work"
+evidence: "docs/conformance.md"
+
+criteria:
+  B01: pass
+  B02: partial
+  B03: pass
+  B04: pass
+  B05: partial
+  B06: partial
+  B07: pass
+  B08: pass
+  B09: pass
+  B10: fail
+  B11: pass
+  B12: pass
+  P01: pass
+  P02: pass
+  P03: pass
+  P04: pass
+  P05: partial
+  P06: pass
+  P07: pass
+  P08: pass
+  S01: pass
+  S02: pass
+  S03: partial
+  S04: partial
+  S05: pass
+  S06: partial
+  S07: unknown
+  S08: pass
+  S09: fail
+  S10: pass
+  D01: pass
+  D02: pass
+  D03: partial
+  D04: pass
+  D05: pass
+  D06: partial
+  R01: fail
+  R02: fail
+  R03: fail
+  R04: fail
+  R05: unknown
+  R06: pass
+  I01: fail
+  I02: fail
+  I03: fail
+  I04: fail
+  I05: unknown
+  I06: fail
+  T01: na
+  T02: na
+  T03: na
+  T04: na
+  T05: na
+  G01: pass
+  G02: partial
+  G03: fail
+  G04: partial
+  G05: pass
+  G06: partial
+  G07: pass
+  G08: pass
+  L01: partial
+  L02: pass
+  L03: fail
+  L04: na
+  L05: unknown
+  L06: na
+  L07: pass
+  X01: na
+  X02: na
+  X03: na
+  X04: fail
+  X05: fail
+  Y01: fail
+  Y02: fail
+  Y03: partial
+  Y04: fail
+  Y05: partial
+  Y06: fail
+  A01: na
+  A02: na
+  A03: na
+  A04: na

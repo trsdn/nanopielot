@@ -1,0 +1,18 @@
+name: Conformance
+
+# Validates .github/conformance.yml against the Repository Quality Standard at
+# the exact version the record names, and checks that the committed badge still
+# matches the record.
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    uses: trsdn/.github/.github/workflows/conformance.yml@main

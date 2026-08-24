@@ -9,8 +9,15 @@
 </p>
 
 <p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/trsdn/nanopielot" alt="License"></a>
+  <a href="package.json"><img src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Ftrsdn%2Fnanopielot%2Fmain%2Fpackage.json&query=%24.engines.node&label=node&color=blue&logo=nodedotjs" alt="Required Node version"></a>
+  <a href="https://github.com/trsdn/nanopielot/actions/workflows/ci.yml"><img src="https://github.com/trsdn/nanopielot/actions/workflows/ci.yml/badge.svg?branch=main" alt="CI"></a>
+  <a href="https://github.com/trsdn/nanopielot/releases/latest"><img src="https://img.shields.io/github/v/release/trsdn/nanopielot" alt="Latest release"></a>
+  <a href="docs/conformance.md"><img src=".github/badges/conformance.svg" alt="Repository quality standard conformance"></a>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/runtime-GitHub_Copilot_SDK-blue?logo=github" alt="Copilot SDK">
-  <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="MIT License">
 </p>
 
 ---
