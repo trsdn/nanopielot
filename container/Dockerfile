@@ -30,8 +30,10 @@ RUN apt-get update && apt-get install -y \
 ENV AGENT_BROWSER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/usr/bin/chromium
 
-# Install agent-browser and GitHub Copilot CLI globally
-RUN npm install -g agent-browser @github/copilot
+# Install agent-browser and GitHub Copilot CLI globally.
+# The CLI is pinned so container builds are reproducible and stay on a version
+# patched against GHSA-9ccr-r5hg-74gf (fixed in 1.0.43).
+RUN npm install -g agent-browser @github/copilot@1.0.80
 
 # Create app directory
 WORKDIR /app
@@ -39,8 +41,8 @@ WORKDIR /app
 # Copy package files first for better caching
 COPY agent-runner/package*.json ./
 
-# Install dependencies
-RUN npm install
+# Install dependencies from the lockfile so audited/pinned versions are used
+RUN npm ci
 
 # Copy source code
 COPY agent-runner/ ./

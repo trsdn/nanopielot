@@ -23,3 +23,36 @@ jobs:
 
       - name: Tests
         run: npx vitest run
+
+  # container/agent-runner had no CI coverage, so dependency bumps touching it
+  # reported a meaningless green check. Build it and the image to catch SDK API
+  # breaks and native-module regressions.
+  agent-runner:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: container/agent-runner/package-lock.json
+
+      - name: Install agent-runner dependencies
+        working-directory: container/agent-runner
+        run: npm ci
+
+      - name: Audit agent-runner
+        working-directory: container/agent-runner
+        run: npm audit --audit-level=high
+
+      - name: Build agent-runner
+        working-directory: container/agent-runner
+        run: npm run build
+
+  container-image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build agent container image
+        run: docker build -t nanopielot-agent:ci container/

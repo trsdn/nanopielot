@@ -384,9 +384,7 @@ export async function processTaskIpc(
         if (data.script !== undefined) updates.script = data.script || null;
         if (data.schedule_type !== undefined)
           updates.schedule_type = data.schedule_type as
-            | 'cron'
-            | 'interval'
-            | 'once';
+            'cron' | 'interval' | 'once';
         if (data.schedule_value !== undefined)
           updates.schedule_value = data.schedule_value;
 

@@ -2,6 +2,23 @@
 
 All notable changes to NanoPieLot will be documented in this file.
 
+## [Unreleased]
+
+### Security
+
+- **All known dependency vulnerabilities resolved** — root project went from 7 advisories (6 high, 1 low) to 0, and `container/agent-runner` from 8 (4 high, 3 moderate, 1 low) to 0. Covers `@github/copilot` (GHSA-9ccr-r5hg-74gf, arbitrary command execution via nested bare repo `core.fsmonitor`), `hono`, `fast-uri`, `ip-address`, `express-rate-limit`, `@hono/node-server`, `body-parser`, `qs`, `js-yaml`, `postcss`, `nanoid`, `vite`, `brace-expansion`, and `esbuild`.
+- **Container now installs from the lockfile** — `container/Dockerfile` used `npm install`, which ignored `package-lock.json`, so audited dependency versions never reached the running agent. Changed to `npm ci`.
+- **Copilot CLI pinned in the container** — the global `npm install -g @github/copilot` was unpinned and therefore non-reproducible. Now pinned to `1.0.80`.
+
+### Changed
+
+- **Copilot SDK upgraded to 1.0.11** — the `@github/copilot` security fix requires a CLI newer than the pinned SDK `0.2.1` could drive, so the SDK was upgraded in both the root project and `container/agent-runner`. API migration: `CopilotClientOptions.cwd` → `workingDirectory`, `MCPLocalServerConfig` → `MCPStdioServerConfig`, and the `session.info` event payload cast updated for the new `InfoData` type.
+- **Prettier pinned to an exact version** — the `^3.8.1` range let the formatter drift to 3.9.6 on lockfile refresh, which silently changes formatting rules and breaks `format:check`. Pinned to `3.9.6` and reformatted the affected files.
+
+### Added
+
+- **CI coverage for `container/`** — `container/agent-runner` previously had no CI at all, so dependency bumps touching it reported a meaningless green check. CI now installs from its lockfile, runs `npm audit --audit-level=high`, builds it, and builds the agent container image.
+
 ## [1.2.2]
 
 ### Added

@@ -26,8 +26,7 @@ const sdkMocks = vi.hoisted(() => {
     sessionMetadataById: new Map<string, { id: string } | undefined>(),
     stopMock: vi.fn(async () => {}),
     sessionBehavior: undefined as
-      | ((args: SessionBehaviorArgs) => Promise<void> | void)
-      | undefined,
+      ((args: SessionBehaviorArgs) => Promise<void> | void) | undefined,
   };
 
   class FakeSession {
@@ -185,8 +184,7 @@ describe('agent-runner tool availability', () => {
         }
 
         const permissionHandler = config.onPermissionRequest as
-          | ((request: unknown) => Promise<unknown>)
-          | undefined;
+          ((request: unknown) => Promise<unknown>) | undefined;
         await permissionHandler?.({
           kind: 'shell',
           toolCallId: 'tool-1',
@@ -208,14 +206,14 @@ describe('agent-runner tool availability', () => {
     setTimeoutSpy.mockClear();
   });
 
-  it('creates Copilot clients with the workspace cwd', async () => {
+  it('creates Copilot clients with the workspace working directory', async () => {
     const { createCopilotClient } = await loadAgentRunnerModule();
     createCopilotClient();
 
     expect(sdkMocks.state.clientOptions).toEqual([
       {
         logLevel: 'warning',
-        cwd: '/workspace/group',
+        workingDirectory: '/workspace/group',
       },
     ]);
   });

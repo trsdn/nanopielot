@@ -18,7 +18,7 @@ import fs from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
 import { CopilotClient, approveAll } from '@github/copilot-sdk';
-import type { CopilotSession, ResumeSessionConfig, SessionConfig, MCPLocalServerConfig } from '@github/copilot-sdk';
+import type { CopilotSession, ResumeSessionConfig, SessionConfig, MCPStdioServerConfig } from '@github/copilot-sdk';
 import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 
@@ -307,7 +307,7 @@ function buildSystemMessage(containerInput: ContainerInput): { mode: 'append'; c
 /**
  * Build the MCP server configuration for the nanopielot tools.
  */
-function buildMcpServers(mcpServerPath: string, containerInput: ContainerInput): Record<string, MCPLocalServerConfig> {
+function buildMcpServers(mcpServerPath: string, containerInput: ContainerInput): Record<string, MCPStdioServerConfig> {
   return {
     nanopielot: {
       command: 'node',
@@ -415,7 +415,7 @@ export async function runQuery(
     if (event.type === 'session.info') {
       const data =
         event.data && typeof event.data === 'object'
-          ? (event.data as Record<string, unknown>)
+          ? (event.data as unknown as Record<string, unknown>)
           : null;
       const infoType = data?.infoType;
       const message = data?.message;
@@ -514,7 +514,7 @@ async function runScript(script: string): Promise<ScriptResult | null> {
 export function createCopilotClient(): CopilotClient {
   return new CopilotClient({
     logLevel: 'warning',
-    cwd: '/workspace/group',
+    workingDirectory: '/workspace/group',
   });
 }
 
