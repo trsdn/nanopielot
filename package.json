@@ -4,15 +4,41 @@
   "description": "Personal Copilot assistant. Lightweight, secure, customizable.",
   "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "license": "MIT",
+  "author": "trsdn",
+  "homepage": "https://github.com/trsdn/nanopielot#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trsdn/nanopielot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/trsdn/nanopielot/issues"
+  },
+  "keywords": [
+    "copilot",
+    "assistant",
+    "agent",
+    "whatsapp",
+    "telegram",
+    "slack",
+    "automation"
+  ],
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "start": "node dist/index.js",
     "dev": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.ts\"",
     "format:fix": "prettier --write \"src/**/*.ts\"",
     "format:check": "prettier --check \"src/**/*.ts\"",
-    "prepare": "husky",
+    "prepare": "test -e .git && husky || true",
     "setup": "tsx setup/index.ts",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
