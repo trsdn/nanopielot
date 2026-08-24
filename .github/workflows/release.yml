@@ -20,10 +20,12 @@ jobs:
           cache: npm
           registry-url: https://registry.npmjs.org
 
-      # Trusted Publishing (OIDC) requires npm >= 11.5.1
+      # Trusted Publishing (OIDC) requires npm >= 11.5.1.
+      # Pinned to the 11.x line: npm 12 blocks dependency install scripts by
+      # default, which prevents better-sqlite3 from building its native binding.
       - name: Upgrade npm
         run: |
-          npm install -g npm@latest
+          npm install -g npm@^11.5.1
           npm --version
 
       - run: npm ci
