@@ -2,6 +2,22 @@
 
 All notable changes to NanoPieLot will be documented in this file.
 
+## [1.2.2]
+
+### Added
+
+- **npm Trusted Publishing** — `.github/workflows/release.yml` publishes to npm from GitHub Actions via OIDC on `v*` tags, with no npm tokens or repository secrets. Runs the full quality gate (`format:check`, `lint`, `typecheck`, `test`, `build`) before publishing.
+- **Publish metadata** — added `files`, `types`, `repository`, `homepage`, `bugs`, `license`, `author`, and `keywords` to `package.json` so the published tarball ships only `dist/` plus `README.md`, `CHANGELOG.md`, and `LICENSE`.
+
+### Changed
+
+- **Build config split** — `npm run build` now uses `tsconfig.build.json`, which excludes `src/**/*.test.ts` so compiled tests no longer land in `dist/` or the published package. `npm run typecheck` still covers tests.
+- **Version alignment** — `package.json` was stuck at `1.0.0` despite tags through `v1.2.1`; it now tracks the released version.
+
+### Fixed
+
+- **`prepare` script broke registry installs** — `prepare` ran `husky` unconditionally, which fails for consumers installing from npm. It is now guarded to run only inside a git checkout.
+
 ## [1.2.1]
 
 ### Changed
@@ -50,6 +66,7 @@ All notable changes to NanoPieLot will be documented in this file.
 - Live model switching with `/model` command per group.
 - All NanoClaw features preserved: containers, channels, skills, scheduling, agent swarms.
 
+[1.2.2]: https://github.com/trsdn/nanopielot/compare/v1.2.1...v1.2.2
 [1.2.1]: https://github.com/trsdn/nanopielot/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/trsdn/nanopielot/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/trsdn/nanopielot/compare/v1.0.0...v1.1.0
