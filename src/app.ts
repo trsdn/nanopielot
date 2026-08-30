@@ -430,7 +430,10 @@ async function runAgent(
   // Wrap onOutput to track session ID from streamed results
   const wrappedOnOutput = onOutput
     ? async (output: ContainerOutput) => {
-        if (output.status === 'error' && isDisconnectedSessionError(output.error)) {
+        if (
+          output.status === 'error' &&
+          isDisconnectedSessionError(output.error)
+        ) {
           clearPersistedSession(group.folder);
         }
         persistSessionIfSuccessful(group.folder, output);
