@@ -522,4 +522,86 @@ describe('app e2e flow', () => {
     expect(getAllSessions()).toEqual({});
     expect(getGroupModel('main')).toBe('claude-sonnet-4.5');
   });
+
+  it('retries once with a fresh session after a disconnected-session error', async () => {
+    setSession('main', 'stale-session');
+
+    runContainerAgentMock
+      .mockImplementationOnce(
+        async (
+          _group: RegisteredGroup,
+          input: { sessionId?: string },
+          _onProcess: unknown,
+          onOutput?: (output: {
+            status: 'success' | 'error';
+            result: string | null;
+            newSessionId?: string;
+            error?: string;
+          }) => Promise<void>,
+        ) => {
+          expect(input.sessionId).toBe('stale-session');
+          await onOutput?.({
+            status: 'error',
+            result: null,
+            newSessionId: 'stale-session',
+            error: 'Client not connected',
+          });
+          return {
+            status: 'success',
+            result: null,
+            newSessionId: 'stale-session',
+          };
+        },
+      )
+      .mockImplementationOnce(
+        async (
+          _group: RegisteredGroup,
+          input: { sessionId?: string },
+          _onProcess: unknown,
+          onOutput?: (output: {
+            status: 'success' | 'error';
+            result: string | null;
+            newSessionId?: string;
+          }) => Promise<void>,
+        ) => {
+          expect(input.sessionId).toBeUndefined();
+          await onOutput?.({
+            status: 'success',
+            result: 'Recovered reply',
+            newSessionId: 'fresh-session',
+          });
+          return {
+            status: 'success',
+            result: 'Recovered reply',
+            newSessionId: 'fresh-session',
+          };
+        },
+      );
+
+    const app = await startNanoPieLotApp({
+      registerSignalHandlers: false,
+      initializeDatabase: false,
+      startBackgroundLoops: false,
+    });
+
+    storeMessageDirect({
+      id: 'm1',
+      chat_jid: 'fake:main',
+      sender: 'user-1',
+      sender_name: 'User One',
+      content: 'hello after disconnect',
+      timestamp: new Date('2026-04-02T10:00:00.000Z').toISOString(),
+      is_from_me: false,
+    });
+
+    await runMessageLoopIteration();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await app.shutdown('session-retry');
+
+    expect(sentMessages).toHaveLength(1);
+    expect(sentMessages[0]?.jid).toBe('fake:main');
+    expect(sentMessages[0]?.text).toBe('Recovered reply');
+    expect(getAllSessions()).toEqual({ main: 'fresh-session' });
+    expect(runContainerAgentMock).toHaveBeenCalledTimes(2);
+  });
 });

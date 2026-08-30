@@ -75,6 +75,24 @@ let queue = new GroupQueue();
 
 const MODEL_COMMAND_PREFIX = '/model';
 
+function persistSessionIfSuccessful(
+  groupFolder: string,
+  output: Pick<ContainerOutput, 'status' | 'newSessionId'>,
+): void {
+  if (output.status !== 'success' || !output.newSessionId) return;
+  sessions[groupFolder] = output.newSessionId;
+  setSession(groupFolder, output.newSessionId);
+}
+
+function clearPersistedSession(groupFolder: string): void {
+  clearSession(groupFolder);
+  delete sessions[groupFolder];
+}
+
+function isDisconnectedSessionError(error?: string): boolean {
+  return typeof error === 'string' && error.includes('Client not connected');
+}
+
 function normalizeModelCommandValue(raw: string): string {
   return raw.trim().replace(/\s+/g, ' ');
 }
@@ -381,7 +399,6 @@ async function runAgent(
   onOutput?: (output: ContainerOutput) => Promise<void>,
 ): Promise<'success' | 'error'> {
   const isMain = group.isMain === true;
-  const sessionId = sessions[group.folder];
   const model = getGroupModel(group.folder);
 
   // Update tasks snapshot for container to read (filtered by group)
@@ -413,34 +430,63 @@ async function runAgent(
   // Wrap onOutput to track session ID from streamed results
   const wrappedOnOutput = onOutput
     ? async (output: ContainerOutput) => {
-        if (output.newSessionId) {
-          sessions[group.folder] = output.newSessionId;
-          setSession(group.folder, output.newSessionId);
+        if (output.status === 'error' && isDisconnectedSessionError(output.error)) {
+          clearPersistedSession(group.folder);
         }
+        persistSessionIfSuccessful(group.folder, output);
         await onOutput(output);
       }
     : undefined;
 
   try {
-    const output = await runContainerAgent(
-      group,
-      {
-        prompt,
-        sessionId,
-        model,
-        groupFolder: group.folder,
-        chatJid,
-        isMain,
-        assistantName: ASSISTANT_NAME,
-      },
-      (proc, containerName) =>
-        queue.registerProcess(chatJid, proc, containerName, group.folder),
-      wrappedOnOutput,
-    );
+    const persistedSessionId = sessions[group.folder];
+    let disconnectedSessionDuringStream = false;
+    const wrappedAttemptOutput = wrappedOnOutput
+      ? async (output: ContainerOutput) => {
+          if (
+            output.status === 'error' &&
+            isDisconnectedSessionError(output.error)
+          ) {
+            disconnectedSessionDuringStream = true;
+          }
+          await wrappedOnOutput(output);
+        }
+      : undefined;
+    const runAttempt = async (
+      sessionId: string | undefined,
+    ): Promise<ContainerOutput> =>
+      runContainerAgent(
+        group,
+        {
+          prompt,
+          sessionId,
+          model,
+          groupFolder: group.folder,
+          chatJid,
+          isMain,
+          assistantName: ASSISTANT_NAME,
+        },
+        (proc, containerName) =>
+          queue.registerProcess(chatJid, proc, containerName, group.folder),
+        wrappedAttemptOutput,
+      );
 
-    if (output.newSessionId) {
-      sessions[group.folder] = output.newSessionId;
-      setSession(group.folder, output.newSessionId);
+    let output = await runAttempt(persistedSessionId);
+    persistSessionIfSuccessful(group.folder, output);
+
+    if (
+      persistedSessionId &&
+      (disconnectedSessionDuringStream ||
+        (output.status === 'error' && isDisconnectedSessionError(output.error)))
+    ) {
+      logger.warn(
+        { group: group.name, sessionId: persistedSessionId },
+        'Persisted session became disconnected, retrying with a fresh session',
+      );
+      clearPersistedSession(group.folder);
+      disconnectedSessionDuringStream = false;
+      output = await runAttempt(undefined);
+      persistSessionIfSuccessful(group.folder, output);
     }
 
     if (output.status === 'error') {
