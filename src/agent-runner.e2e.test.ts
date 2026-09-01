@@ -218,6 +218,26 @@ describe('agent-runner tool availability', () => {
     ]);
   });
 
+  it('forwards COPILOT_GITHUB_TOKEN to the client when token auth is used', async () => {
+    const previous = process.env.COPILOT_GITHUB_TOKEN;
+    process.env.COPILOT_GITHUB_TOKEN = 'ghp_containertoken123';
+    try {
+      const { createCopilotClient } = await loadAgentRunnerModule();
+      createCopilotClient();
+
+      expect(sdkMocks.state.clientOptions).toEqual([
+        {
+          logLevel: 'warning',
+          workingDirectory: '/workspace/group',
+          gitHubToken: 'ghp_containertoken123',
+        },
+      ]);
+    } finally {
+      if (previous === undefined) delete process.env.COPILOT_GITHUB_TOKEN;
+      else process.env.COPILOT_GITHUB_TOKEN = previous;
+    }
+  });
+
   it('creates sessions without a restrictive availableTools allowlist', async () => {
     const { createCopilotClient, runQuery } = await loadAgentRunnerModule();
     const client = createCopilotClient();
