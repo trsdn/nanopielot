@@ -1,29 +1,33 @@
 # Conformance record for trsdn/nanopielot.
 #
-# Format: https://github.com/trsdn/.github/blob/v1.2.0/docs/conformance-record.md
+# Format: https://github.com/trsdn/.github/blob/main/docs/conformance-record.md
 # Per-criterion notes and rationale: docs/conformance.md
 #
 # The badge in .github/badges/ is generated from this file. Change the evidence
 # first, then this record, then regenerate. Never the other way round.
 
-standard_version: "1.2.0"
-assessed_on: "2026-08-24"
+standard_version: "1.21.0"
+assessed_on: "2026-09-22"
 state: "Needs work"
 evidence: "docs/conformance.md"
 
 criteria:
   B01: pass
-  B02: partial
+  B02: pass
   B03: pass
   B04: pass
   B05: partial
-  B06: partial
+  B06: pass
   B07: pass
   B08: pass
   B09: pass
-  B10: fail
+  B10: pass
   B11: pass
   B12: pass
+  B13: partial
+  B14: pass
+  B15: partial
+  B16: pass
   P01: pass
   P02: pass
   P03: pass
@@ -32,65 +36,85 @@ criteria:
   P06: pass
   P07: pass
   P08: pass
+  P09: fail
+  P10: pass
+  P11: partial
+  P12: pass
+  P13: pass
   S01: pass
   S02: pass
-  S03: partial
+  S03: pass
   S04: partial
   S05: pass
   S06: partial
-  S07: unknown
-  S08: pass
+  S07: partial
+  S08: partial
   S09: fail
   S10: pass
+  S11: pass
+  S12: pass
+  S13: na
   D01: pass
   D02: pass
   D03: partial
   D04: pass
   D05: pass
   D06: partial
-  R01: fail
+  R01: pass
   R02: fail
-  R03: fail
-  R04: fail
-  R05: unknown
+  R03: pass
+  R04: pass
+  R05: fail
   R06: pass
-  I01: fail
-  I02: fail
-  I03: fail
+  R07: partial
+  R08: pass
+  R09: partial
+  I01: pass
+  I02: pass
+  I03: pass
   I04: fail
-  I05: unknown
+  I05: na
   I06: fail
   T01: na
   T02: na
   T03: na
   T04: na
   T05: na
+  W01: na
+  W02: na
+  W03: na
+  W04: na
+  W05: na
+  W06: na
+  W07: na
+  W08: na
+  W09: na
   G01: pass
   G02: partial
-  G03: fail
-  G04: partial
-  G05: pass
-  G06: partial
+  G03: pass
+  G04: pass
+  G05: partial
+  G06: pass
   G07: pass
   G08: pass
-  L01: partial
+  L01: pass
   L02: pass
-  L03: fail
+  L03: pass
   L04: na
-  L05: unknown
+  L05: na
   L06: na
   L07: pass
   X01: na
   X02: na
   X03: na
   X04: fail
-  X05: fail
-  Y01: fail
-  Y02: fail
-  Y03: partial
-  Y04: fail
-  Y05: partial
-  Y06: fail
+  X05: pass
+  Y01: pass
+  Y02: pass
+  Y03: pass
+  Y04: pass
+  Y05: pass
+  Y06: pass
   A01: na
   A02: na
   A03: na

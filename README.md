@@ -83,7 +83,7 @@ collects nothing.
 | What is collected | Nothing by this project: no telemetry, no analytics, no crash reporting. |
 | Where data goes | The channels you enable (WhatsApp, Telegram, Slack, Discord, Gmail) and the GitHub Copilot API, which your agent containers call to respond. No other outbound destination. |
 | Who receives your content | GitHub (via the Copilot SDK/API) and whichever chat platforms you connect. Their own terms and privacy policies govern what they do with it. |
-| What is stored locally | Conversation and group state in SQLite (`src/db.ts`), per-group memory under `groups/`, and the Copilot device-login session under `data/copilot-auth/`. All on the machine you run it on. |
+| What is stored locally | Conversation and group state in SQLite at `store/messages.db`, per-group memory under `groups/`, and the Copilot device-login session under `data/copilot-auth/`. All on the machine you run it on. |
 | Retention | Kept until you delete the data directory or the group; nothing is sent anywhere for retention beyond the platforms above. |
 
 ## Accessibility

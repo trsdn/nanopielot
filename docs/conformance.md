@@ -1,18 +1,16 @@
 # Conformance Assessment: trsdn/nanopielot
 
 - Standard version:
-  [1.2.0](https://github.com/trsdn/.github/blob/v1.2.0/docs/repository-quality-standard.md)
-- Assessed on: 2026-08-24
+  [1.21.0](https://github.com/trsdn/.github/blob/v1.21.0/docs/repository-quality-standard.md)
+- Assessed on: 2026-09-22
 - State: **Needs work**
 - Record: [`.github/conformance.yml`](../.github/conformance.yml)
 
-Results: 31 pass, 15 partial, 19 fail, 4 unknown, 14 not applicable.
-
-The state is `Needs work` rather than `At risk`. The failures are concentrated in
-release mechanics, product identity, and privacy disclosure. None of them is a
-critical gap as the standard defines one: there are no committed secrets, secret
-scanning and push protection are enabled, private vulnerability reporting is on,
-and normal use of the project is supportable today.
+Results: 59 pass, 15 partial, 7 fail, 26 not applicable. The whole standard
+was re-read for this pass, not diffed from the 1.2.0 record of 2026-08-24
+(31 pass, 15 partial, 19 fail, 4 unknown, 14 not applicable). Most of that
+record's findings still held and were re-verified against the current tree
+rather than carried over unread.
 
 ## Profiles
 
@@ -20,170 +18,104 @@ and normal use of the project is supportable today.
 |---|---|---|
 | Public | Yes | Public repository |
 | Software | Yes | TypeScript application with a test suite |
-| Deployable | Yes | Runs as a long-lived service via launchd and containers |
-| Package | Yes | Publishes tagged GitHub releases |
+| Deployable | Yes | Runs as a long-lived service via launchd/systemd and containers, started by a `/setup` install rather than by hand each time |
+| Package | Yes | Publishes to npm and tagged GitHub releases |
+| Published Site | No | This ships a personal AI-agent framework that a developer forks, configures (Docker/Apple Container, GitHub Copilot CLI device login, `/setup`), and self-hosts. Per [decision 0020](https://github.com/trsdn/.github/blob/main/docs/decisions/0020-public-applications-need-a-site.md), that is the excluded case: "an agent tool that ... a developer configures rather than installs by name." There is no `npm install -g` or `bin` entry point, and the README's own Quick Start is `gh repo fork` + `git clone`, not an install-by-name step for a non-developer. `W01`-`W09` are `na` for that reason. |
 | Documentation | No | `docs/` supports the software; documentation is not the product |
-| Archived | No | Actively maintained |
+| Archived | No | Actively maintained (pushed 2026-09-13, this pass added more) |
 
-## Critical findings
+## What improved since 1.2.0
 
-### B10 — Ownership and maintenance status are clear — `fail`
+Fixed in this pass (pull requests
+[#68](https://github.com/trsdn/nanopielot/pull/68) and
+[#69](https://github.com/trsdn/nanopielot/pull/69)):
 
-`.github/CODEOWNERS` assigns every path to `@gavrielc` and `@gabi-simons`, the
-upstream NanoClaw authors. Neither has access to this fork. GitHub's own
-CODEOWNERS API reports an error on every line:
+| Criterion | 1.2.0 | Now | What changed |
+|---|---|---|---|
+| `B02` | partial | pass | README states maintenance status, audience, and the primary language, in addition to the setup and key links it already had. |
+| `B10` | fail | pass | README now carries an explicit maintenance-status statement; ownership defaults to the account that owns the repository (`trsdn`, a personal account), independent of `CODEOWNERS` (see below). |
+| `G03` | fail | pass | `AGENTS.md` gained a "Do not do these" section: history rewriting/force push, credential files, hand releases, the service definitions, destructive data operations. |
+| `G08` | — (file absent) | pass | `.github/github-app.yml` added, pointing at `AGENTS.md`. |
+| `L01`, `L03` | partial / fail | pass | README states "English only" for both. |
+| `P03` | pass (by profile, weak) | pass (substantively) | `docs/SECURITY.md` previously only redirected to the unrelated upstream [NanoClaw](https://github.com/qwibitai/nanoclaw) security guide and said nothing about *this* repository. Rewritten with this repository's own scope, reporting route, and credential handling. |
+| `X05` | fail | pass | README's new *Accessibility* section states the limitation: no interface of its own. |
+| `Y01`, `Y02`, `Y04` | fail | pass | README's new *Data and privacy* section states what is collected (nothing by this project), where data goes (the channels enabled, plus the GitHub Copilot API), and where local state lives (`store/messages.db`, `groups/`, `data/copilot-auth/`). |
+| `Y05` | partial | pass | The same section names GitHub/Copilot and the connected chat platforms as recipients of message content. |
+| `Y06` | fail | pass | States retention: kept until the data directory or group is deleted. |
+| `B14` | not previously assessed at this identifier | pass | `docs/SECURITY.md` now names how to handle an exposed Copilot session or channel credential. |
+| `R01` | fail | pass | `package.json` gained `license`, `repository`, and `bugs` fields since 1.2.0 (release 1.2.2); all agree with the GitHub repository. |
+| `R03`, `R04` | fail | pass | `.github/workflows/release.yml` now publishes on `v*` tags via OIDC; the latest release (`v1.2.2`) has tag, `package.json` version, and release title all agreeing. |
 
-```text
-Unknown owner on line 2: make sure @gavrielc exists and has write access
-```
+Also merged, outside this branch: the repository's own clean Dependabot PR
+[#60](https://github.com/trsdn/nanopielot/pull/60) (`fast-uri` in
+`container/agent-runner`).
 
-The consequence is not cosmetic. Code ownership silently does nothing: no review
-is requested, and a rule that appears to protect `/src/`, `/container/`,
-`package.json`, and `package-lock.json` protects none of them. A file that looks
-like governance and enforces nothing is worse than no file, because it stops
-anyone from asking who reviews these paths.
+## Still failing, and why they were left
 
-Remediation: point the entries at the actual owner, or delete the file and say so
-in `AGENTS.md`.
+| Criterion | Result | Why |
+|---|---|---|
+| `S09` | fail | The default branch is protected (blocks force-push and deletion, `B16` pass) but no ruleset or classic protection requires any check before merge, so `ci`'s checks are informative, not gating. Fixing this is a branch-protection change, which this work is not authorised to make; recorded, not fixed. |
+| `P09` | fail | No self-hosted repository stats card is published, and a runner is available (public repo with Actions). Not built in this pass; the [`templates/repo-stats/`](https://github.com/trsdn/.github/blob/main/templates/repo-stats) kit is the documented remediation. |
+| `R02` | fail | No versioning-and-compatibility statement exists in the README or `CHANGELOG.md`; versions increment without a stated policy. |
+| `R05` | fail | No smoke kit checks the published `nanopielot` npm artifact after publish. The published package has no `bin` entry (it is a library export, not the documented install path), so a minimal kit would be a self-test such as `node -e "require('nanopielot')"` against the installed tarball; not built in this pass. |
+| `I04` | fail | No source-level version/about surface was found: no `--version` output, no status command that reports the repository or issue tracker. |
+| `I06` | fail | The published version is a hand-edited `package.json` field (the 1.2.2 changelog entry describes correcting it by hand after it drifted from the tags), not derived by the build from the tag. |
+| `X04` | fail | `src/logger.ts` writes ANSI colour codes unconditionally; no `NO_COLOR` support or TTY check is documented. |
 
-### R04, I01, I06 — Version drift between the release and the artifact — `fail`
+`R07` is `partial`, not `fail`: the `v1.2.2` release notes describe that
+version's changes but neither match nor link the `CHANGELOG.md [1.2.2]`
+entry — the same content, reworded. `R09` is `partial`: no open secret-scanning
+alert exists, but open Dependabot alerts (at least one high-severity, in
+`js-yaml` and previously `fast-uri`) remain against the current commit without
+a recorded reason; several fixes are open as Dependabot PRs
+(`#62`-`#67`) but each fails its `agent-runner` CI job on
+`npm audit --audit-level=high` for advisories none of those individual diffs
+fully resolves alone, so merging any one over that red check was not done.
 
-`package.json` declares `1.0.0`. The changelog's newest entry is `1.2.1`, and
-four releases exist up to `v1.2.1`. The published artifact therefore identifies
-itself as a version that was superseded three releases ago.
+None of the failing criteria is in the standard's critical list
+(`B04`, `D01`-`D04`, `D06`), so the state is `Needs work` rather than
+`At risk`: there is no committed secret, secret scanning and push protection
+are enabled, Dependabot alerts and security updates are on, and normal use of
+the project is supportable today.
 
-`I06` is the criterion that explains why this happened: identity metadata is
-maintained by hand instead of produced by the build, so nothing forces it to
-follow the tag. Correcting the number today fixes the symptom and leaves the
-mechanism in place.
+## Partial results, condensed
 
-Remediation: derive the version from the tag at build time, and have the release
-workflow refuse to publish when tag and manifest disagree.
+| Criterion | Assessment |
+|---|---|
+| `B05`, `G02`, `G05` | No single command is documented as *the* thing to run before proposing a change. CI runs `format:check`, `lint`(only in some jobs), `typecheck`, and `test` as separate steps, and `AGENTS.md`'s Development section documents `npm run dev`/`build`/the container rebuild but not validation. |
+| `B13` | `Node.js 20+` is restated by hand in the README (and dynamically in a badge, which does not count against this) without a link to `package.json`'s `engines` field; it agrees, so this is a repetition rather than drift. |
+| `B15` | Dependencies are resolved by npm at install time and nothing is vendored — true of the tree, but no sentence in the repository says so. |
+| `P05` | Install (Quick Start) and compatibility (Requirements) are covered; security and support are now covered; configuration and a concrete usage example are still thin. |
+| `P11` | `.github/PULL_REQUEST_TEMPLATE.md` collects what changed and a skill-specific checklist, but not how the change was verified, its risk, or a linked issue. |
+| `S04` | CI (`ci.yml`) runs on `ubuntu-latest` only; the README claims macOS, Linux, and Windows (via WSL2). |
+| `S06` | Not independently re-verified this pass beyond the 1.2.0 finding; config is read from `.env`/environment with no committed default observed. |
+| `S07` | Not independently re-verified this pass; `docs/TROUBLESHOOTING.md` and `docs/DEBUG_CHECKLIST.md` suggest diagnosable logging exists, but credential-safe logging in `src/` was not read end to end. |
+| `S08` | `.github/dependabot.yml` configures version updates for `github-actions`, `/container/agent-runner`, and the Docker image, but not the root npm manifest; root security patches still arrive through GitHub's separate automated-security-fixes feature (`P12`, pass). |
+| `D03`, `D06` | Service management commands exist (README); a stated rollback/restore path for the SQLite store does not. |
 
-### R03 — A tag produces installable artifacts through automation — `fail`
+## Ownership note (`CODEOWNERS`)
 
-The only workflows are `ci.yml` and `label-pr.yml`. The four existing releases
-were created by hand. Nothing verifies that a tag, the manifest, and the release
-title agree, which is precisely how the drift above went unnoticed.
+`.github/CODEOWNERS` still assigns `/src/`, `/container/`, `/groups/`,
+`/launchd/`, and the manifest files to `@gavrielc` and `@gabi-simons`, the
+upstream NanoClaw authors, who have no access to this fork. This does not fail
+`B10` — the repository is owned by the `trsdn` account, which is who the
+criterion's ownership part defaults to for a personal account — but it means
+those `CODEOWNERS` entries do nothing (GitHub cannot request a review from an
+account without access), which is worth the maintainer's attention even
+though no criterion scores it directly.
 
-### S09 — Required checks protect the default branch — `fail`
+## Not applicable
 
-Branch protection exists on `main`, but no status check is required and linear
-history is not enforced. `ci.yml` runs format, typecheck, and tests on every pull
-request, and none of them can block a merge. The verification is bought and not
-spent.
-
-## Release and packaging
-
-### R01 — Package metadata is complete and agrees with repository metadata — `fail`
-
-`package.json` has no `license`, `repository`, or `bugs` field. Its `description`
-("Personal Copilot assistant. Lightweight, secure, customizable.") also disagrees
-with the repository description ("NanoClaw, ported to the GitHub Copilot SDK…").
-
-This is what makes `I02` and `I03` fail as well: the artifact cannot embed a
-repository URL, an issue tracker URL, or a license identifier that is not
-recorded anywhere.
-
-### R02 — Versioning and compatibility policy are documented — `fail`
-
-Versions are incremented, but no policy states what a major, minor, or patch
-change means for this project, so no consumer can predict what an upgrade breaks.
-
-### R05, I05 — `unknown`
-
-Whether built artifacts are smoke-tested from a clean environment, and whether
-the banner in `assets/` is embedded in the artifact rather than only rendered in
-the README, were not established. `unknown` is recorded rather than a guess.
-
-## Privacy
-
-The Y criteria are the weakest area, and the reason is structural: this project
-relays a user's private messages to a third-party AI provider and stores them
-locally, and none of that is written down anywhere.
-
-- **Y01, Y02 — `fail`.** No document states what data is collected, stored, or
-  transmitted, or which outbound destinations exist. In practice they include at
-  least the Telegram Bot API and the GitHub Copilot API.
-- **Y04, Y06 — `fail`.** `src/db.ts` stores messages in a SQLite database at
-  `store/messages.db`. That location, and whether anything is ever deleted, is
-  undocumented. A user cannot find, export, or delete their own message history
-  from the documentation alone.
-- **Y05 — `partial`.** The README makes the Copilot SDK obvious. That the
-  message content itself reaches GitHub, and that Telegram sees it first, is
-  never stated as a privacy consequence.
-- **Y03 — `partial`.** No telemetry or analytics were found, which is the right
-  default. It is not disclosed, so a reader has to take it on trust.
-
-None of this is a leak. It is an absence of disclosure, and it is cheap to fix:
-one `docs/PRIVACY.md` answers all six.
-
-## Accessibility
-
-- **X04 — `fail`.** `src/logger.ts` writes raw ANSI escapes (`\x1b[34m` and
-  friends) unconditionally. There is no `NO_COLOR` check and no TTY detection, so
-  log output carries escape sequences into files, pipes, and screen readers.
-  This is the one accessibility criterion that fully applies to a
-  terminal-and-bot product, and it is the one that fails.
-- **X05 — `fail`.** No known limitations are stated.
-- **X01, X02, X03 — `na`.** There is no graphical interface.
-
-## Agent readiness
-
-`AGENTS.md` is real and useful: it states the context, the key files, the secrets
-model, and how to run the service. Three gaps:
-
-- **G03 — `fail`.** No forbidden or high-risk operation is named. An agent is not
-  told what it must not do.
-- **G02 — `partial`.** The Development section documents `npm run dev`,
-  `npm run build`, and the container rebuild — how to *run* the project, but not
-  how to *validate* a change. `lint`, `typecheck`, `format:check`, and `test`
-  all exist as scripts and none is mentioned.
-- **G04 — `partial`.** `.github/copilot-instructions.md` carries a rule that
-  `AGENTS.md` does not: never work directly on `main`, always go through a pull
-  request. A rule that binds one tool and not another is a rule that will be
-  followed inconsistently.
-
-## Language
-
-- **L03 — `fail`, L01 — `partial`.** Everything user-facing is English, and no
-  German or other non-English strings were found. Neither the primary language
-  nor the localization stance is declared, so "English-only" is an observation
-  rather than a commitment.
-- **L05 — `unknown`.** `src/timezone.test.ts` shows date handling is deliberate;
-  whether formatting uses platform locale APIs was not established.
-
-## Badges
-
-**P08 — `pass`, after this change.** The README previously carried two hardcoded
-shields.io badges. The `license-MIT` badge was the instructive one: it asserted
-MIT while `package.json` declares no license at all. It was correct only because
-`LICENSE` happened to agree with it, and nothing kept them agreeing.
-
-The required badge block is now present in the order the convention specifies —
-license, runtime, CI, latest release, conformance — and every value is derived
-from an authoritative source: GitHub's detected license, `engines.node` read from
-the manifest, the workflow's own status, the latest release, and the generated
-conformance badge. Each links to what it reports. The decorative "Copilot SDK"
-badge is kept, separated from the required block, and duplicates no manifest
-field.
-
-## Notable passes
-
-- **S02, S05, S08** — 19 test files cover routing, IPC authentication, the sender
-  allowlist, database migration, and end-to-end flows. Secret scanning and push
-  protection are on, Dependabot is configured, and the changelog shows CodeQL
-  findings being triaged and fixed rather than dismissed.
-- **B04** — `.gitignore` is unusually careful. It excludes `store/`, `data/`,
-  `logs/`, and `*.keys.json`, and uses negative patterns to track exactly the
-  `groups/*/AGENTS.md` files that are meant to be tracked.
-- **D01, D02, D04** — Setup, the launchd unit, the container build, and the
-  device-login session model are all documented, and the secrets model
-  deliberately avoids committing raw tokens.
-- **S10** — `docs/SPEC.md` and `docs/APPLE-CONTAINER-NETWORKING.md` capture
-  constraints that would otherwise have to be rediscovered.
+| Criteria | Rationale |
+|---|---|
+| `T01`-`T05` | The Documentation profile does not apply; `docs/` supports the software product. |
+| `W01`-`W09` | See *Profiles* above. |
+| `L04`-`L06` | English-only, declared in the README, no string catalogs. |
+| `X01`-`X03` | No graphical interface of this project's own. |
+| `I05` | No icon surface: no installer, store listing, or site. |
+| `S13` | No workflow uses `pull_request_target` or `workflow_run`. |
+| `A01`-`A04` | The repository is not archived. |
 
 ## Reassessment
 
-Due by 2027-02-24. The conformance check fails once the record ages past that
-point and stays red until the repository is reassessed.
+Due by 2027-03-22.
