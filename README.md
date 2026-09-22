@@ -22,6 +22,14 @@
 
 ---
 
+**Status:** actively maintained, best-effort, as a personal project of
+[@trsdn](https://github.com/trsdn). It is for a developer comfortable forking a
+repository, running Docker or Apple Container, and authenticating the GitHub
+Copilot CLI — not a packaged app a non-developer installs by name.
+
+**Language:** this project's interface, documentation, and source are English
+only; no localized builds are published.
+
 ## What Changed from NanoClaw
 
 NanoPieLot is a full port of [NanoClaw](https://github.com/qwibitai/nanoclaw) from Anthropic/Claude to the GitHub Copilot SDK:
@@ -64,6 +72,33 @@ Channels → SQLite → Polling loop → Container (GitHub Copilot SDK) → Resp
 ```
 
 Single Node.js process. Channels self-register at startup. Agents run in isolated Linux containers. Per-group message queue with concurrency control.
+
+## Data and privacy
+
+NanoPieLot runs on infrastructure you provide and control; this project itself
+collects nothing.
+
+| Question | Answer |
+|---|---|
+| What is collected | Nothing by this project: no telemetry, no analytics, no crash reporting. |
+| Where data goes | The channels you enable (WhatsApp, Telegram, Slack, Discord, Gmail) and the GitHub Copilot API, which your agent containers call to respond. No other outbound destination. |
+| Who receives your content | GitHub (via the Copilot SDK/API) and whichever chat platforms you connect. Their own terms and privacy policies govern what they do with it. |
+| What is stored locally | Conversation and group state in SQLite (`src/db.ts`), per-group memory under `groups/`, and the Copilot device-login session under `data/copilot-auth/`. All on the machine you run it on. |
+| Retention | Kept until you delete the data directory or the group; nothing is sent anywhere for retention beyond the platforms above. |
+
+## Accessibility
+
+NanoPieLot has no graphical interface of its own; every surface is either a
+chat platform's own client (WhatsApp, Telegram, Slack, Discord, Gmail — their
+accessibility, not this project's) or plain-text console/log output during
+setup and debugging, which uses no colour-only signalling.
+
+## Security and support
+
+Report a vulnerability privately through GitHub's [private vulnerability
+reporting](https://github.com/trsdn/nanopielot/security/advisories/new). Ask
+for help by opening an issue with the `/debug` skill's output; see
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) first.
 
 ## Contributing Workflow
 
