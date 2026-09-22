@@ -77,3 +77,28 @@ systemctl --user restart nanopielot
 ## Container Build Cache
 
 The container buildkit caches the build context aggressively. `--no-cache` alone does NOT invalidate COPY steps — the builder's volume retains stale files. To force a truly clean rebuild, prune the builder then re-run `./container/build.sh`.
+
+## Do not do these
+
+- Do not rewrite history, force push, or delete branches.
+- Do not commit secrets, tokens, or personal data. The Copilot device-login
+  session under `data/copilot-auth/`, channel credentials (WhatsApp session
+  files, bot tokens), and anything under `.env` are git-ignored; never add them
+  back or paste a token into an issue, PR, or commit message.
+- Do not run `npm publish`, create or move tags, or create GitHub releases by
+  hand. `v*` tags trigger `.github/workflows/release.yml`, which publishes to
+  npm over OIDC; that is the maintainer's action.
+- Do not change what `launchctl`/`systemctl` install or start without saying so
+  in the pull request: the service definitions in `launchd/` and the systemd
+  unit are what keeps an installed instance running unattended, and a bad
+  change there breaks it silently until the next restart.
+- Do not delete or truncate a group's SQLite data (`src/db.ts`), its
+  filesystem, or another group's isolated memory without the user asking for
+  it by name. These hold conversation state and per-group memory that cannot
+  be recreated.
+
+## Attribution
+
+Agent-authored commits carry a `Co-authored-by` trailer naming the agent, and
+every change reaches `main` through a pull request, per the [Contributing
+Workflow](README.md#contributing-workflow).
