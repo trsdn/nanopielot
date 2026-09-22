@@ -1,0 +1,10 @@
+# Repository configuration for the GitHub Copilot app.
+# Reference: https://docs.github.com/copilot/reference/github-copilot-app-reference/repository-configuration
+
+# AGENTS.md is the only copy of the instructions. Restating them here would let
+# the two drift apart.
+instructions: |
+  Read AGENTS.md in the repository root before changing anything. It names the
+  key files, the skill system, the service-management commands, and what not to
+  touch: secrets and auth sessions, hand releases, the launchd/systemd service
+  definitions, and a group's SQLite data or memory.
