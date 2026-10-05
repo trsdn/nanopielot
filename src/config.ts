@@ -6,10 +6,12 @@ import { isValidTimezone } from './timezone.js';
 
 // Read config values from .env (falls back to process.env).
 // Interactive Copilot auth is stored separately under DATA_DIR/copilot-auth.
+// COPILOT_GITHUB_TOKEN is an optional alternative to device-login auth.
 const envConfig = readEnvFile([
   'ASSISTANT_NAME',
   'ASSISTANT_HAS_OWN_NUMBER',
   'TZ',
+  'COPILOT_GITHUB_TOKEN',
 ]);
 
 export const ASSISTANT_NAME =
@@ -41,6 +43,11 @@ export const STORE_DIR = path.resolve(PROJECT_ROOT, 'store');
 export const GROUPS_DIR = path.resolve(PROJECT_ROOT, 'groups');
 export const DATA_DIR = path.resolve(PROJECT_ROOT, 'data');
 export const COPILOT_AUTH_DIR = path.resolve(DATA_DIR, 'copilot-auth');
+
+// Token-based Copilot auth: alternative to device-login.
+// Read from .env (preferred) or process.env as fallback.
+export const COPILOT_GITHUB_TOKEN =
+  envConfig.COPILOT_GITHUB_TOKEN || process.env.COPILOT_GITHUB_TOKEN || '';
 
 export const CONTAINER_IMAGE =
   process.env.CONTAINER_IMAGE || 'nanopielot-agent:latest';

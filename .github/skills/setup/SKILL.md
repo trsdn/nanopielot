@@ -124,17 +124,47 @@ Run `npx tsx setup/index.ts --step container -- --runtime <chosen>` and parse th
 
 ## 4. Copilot Authentication
 
-NanoPieLot uses the GitHub Copilot SDK's signed-in-user flow. The login happens once via device auth and is stored in `data/copilot-auth/`, which each agent container mounts at `/home/node/.copilot`.
+NanoPieLot supports two authentication methods for the GitHub Copilot SDK:
 
-First, check whether Copilot auth is already configured:
+1. **Token-based (recommended):** Set `COPILOT_GITHUB_TOKEN` in `.env` with a GitHub PAT that has Copilot access. No device login needed.
+2. **Device login:** Interactive `copilot login` flow inside a container. Stores session in `data/copilot-auth/`.
+
+Scope the PAT as narrowly as your Copilot plan allows. Like the device-login
+session, the token is reachable from inside the agent container, so it should
+never be a broadly-scoped token you also use elsewhere.
+
+### 4a. Check for token-based auth
+
+First, run the auth check:
 
 ```bash
 npx tsx setup/index.ts --step copilot-auth -- --runtime <chosen>
 ```
 
-If `LOGGED_IN=true`, continue to step 5.
+If `AUTH_METHOD=token` and `LOGGED_IN=true`, the user has `COPILOT_GITHUB_TOKEN` configured. Continue to step 5.
 
-If `LOGGED_IN=false`, start device login:
+If `LOGGED_IN=true` (device auth), also continue to step 5.
+
+### 4b. No auth configured
+
+If `LOGGED_IN=false`, AskUserQuestion: How would you like to authenticate with Copilot?
+- **GitHub token (recommended)** — "Provide a GitHub PAT with Copilot scope. More secure — you control the token's permissions."
+- **Device login** — "Interactive browser flow. Grants broad OAuth scopes beyond what NanoPieLot needs."
+
+**If token:** Do **not** ask the user to paste the PAT into the chat and do not write it with a shell command — that would put the secret into the conversation transcript and the shell history. Instead, tell the user to add the line themselves in an editor:
+
+```
+COPILOT_GITHUB_TOKEN=<their-token>
+```
+
+If `.env` already contains a `COPILOT_GITHUB_TOKEN` line, they should replace it rather than append a second one, so it stays unambiguous which value is in use.
+
+Once they confirm they saved the file, re-run the auth check to verify:
+```bash
+npx tsx setup/index.ts --step copilot-auth -- --runtime <chosen>
+```
+
+**If device login:** Start the device flow:
 
 ```bash
 npx tsx setup/index.ts --step copilot-auth -- --runtime <chosen> --login
@@ -227,7 +257,7 @@ Run `npx tsx setup/index.ts --step verify` and parse the status block.
 **If STATUS=failed, fix each:**
 - SERVICE=stopped → `npm run build`, then restart: `launchctl kickstart -k gui/$(id -u)/com.nanopielot` (macOS) or `systemctl --user restart nanopielot` (Linux) or `bash start-nanopielot.sh` (WSL nohup)
 - SERVICE=not_found → re-run step 7
-- CREDENTIALS=missing → re-run step 4 (`npx tsx setup/index.ts --step copilot-auth -- --runtime <chosen> --login`)
+- CREDENTIALS=missing → re-run step 4 (token: check `COPILOT_GITHUB_TOKEN` in `.env`; device: `npx tsx setup/index.ts --step copilot-auth -- --runtime <chosen> --login`)
 - CHANNEL_AUTH shows `not_found` for any channel → re-invoke that channel's skill (e.g. `/add-telegram`)
 - REGISTERED_GROUPS=0 → re-invoke the channel skills from step 5
 - MOUNT_ALLOWLIST=missing → `npx tsx setup/index.ts --step mounts -- --empty`
